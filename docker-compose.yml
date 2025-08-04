@@ -40,6 +40,41 @@ services:
       retries: 5
       start_period: 10s
 
+  # backend:
+  #   image: voice-translator-backend:latest
+  #   container_name: voice_translator_backend
+  #   environment:
+  #     ENVIRONMENT: ${ENVIRONMENT}
+  #     DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+  #     REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+  #     SECRET_KEY: ${SECRET_KEY}
+  #     ALGORITHM: ${ALGORITHM}
+  #     ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+  #     PROJECT_NAME: ${PROJECT_NAME}
+  #     DEBUG: ${DEBUG}
+  #     HF_HOME: /app/hf_cache
+  #     TRANSFORMERS_CACHE: /app/hf_cache
+  #     HUGGINGFACE_HUB_CACHE: /app/hf_cache
+  #   ports:
+  #     - "${VTA_BACKEND_PORT}:8000"
+  #   volumes:
+  #     - ./logs:/app/logs
+  #     - ./backend/hf_cache:/app/hf_cache
+  #   networks:
+  #     - voice_translator_network
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+  #     interval: 120s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 40s
+  #   restart: unless-stopped
+
   adminer:
     image: adminer:latest
     container_name: voice_translator_adminer

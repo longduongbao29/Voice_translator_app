@@ -6,6 +6,9 @@ from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from app.models import User
 from app.schemas import UserCreate
+from app.utils.logger import Logger
+
+logger = Logger(__name__)
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -15,12 +18,15 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
+logger.info("Authentication service initialized")
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify password"""
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
     """Hash password"""
+    logger.debug("Password hashing requested")
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -33,6 +39,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    
+    logger.info(f"Access token created for user: {data.get('sub', 'unknown')}")
     return encoded_jwt
 
 def verify_token(token: str) -> Optional[str]:
@@ -40,13 +48,20 @@ def verify_token(token: str) -> Optional[str]:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
+        logger.debug(f"Token verified for user: {username}")
         return username
-    except JWTError:
+    except JWTError as e:
+        logger.warning(f"Token verification failed: {str(e)}")
         return None
 
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
     """Get user by email"""
-    return db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter(User.email == email).first()
+    if user:
+        logger.debug(f"User found by email: {email}")
+    else:
+        logger.debug(f"No user found with email: {email}")
+    return user
 
 def get_user_by_username(db: Session, username: str) -> Optional[User]:
     """Get user by username"""

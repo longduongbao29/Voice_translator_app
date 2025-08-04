@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y \
     g++ \
     pkg-config \
     libpq-dev \
+    ffmpeg \
+    portaudio19-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better layer caching
@@ -27,10 +29,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
-# Create non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-RUN chown -R appuser:appuser /app
-USER appuser
+
+USER root
 
 # Expose port
 EXPOSE 8000

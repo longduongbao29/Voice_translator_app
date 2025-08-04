@@ -5,6 +5,8 @@
 .env.test
 .env.development
 
+hf_cache/
+test/
 # Python
 __pycache__/
 *.py[cod]
@@ -36,44 +38,11 @@ env/
 ENV/
 .venv/
 
-# PyInstaller
-*.manifest
-*.spec
 
-# Unit test / coverage reports
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-
-# Jupyter Notebook
-.ipynb_checkpoints
 
 # pyenv
 .python-version
 
-# Celery
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Spyder
-.spyderproject
-.spyproject
-
-# Rope
-.ropeproject
-
-# mkdocs
-/site
 
 # mypy
 .mypy_cache/
@@ -97,9 +66,6 @@ build/
 .expo/
 .expo-shared/
 
-# Dependencies
-package-lock.json
-yarn.lock
 
 # Database
 *.db
@@ -108,46 +74,15 @@ yarn.lock
 postgres_data/
 redis_data/
 
-# Docker
-.dockerignore
 
 # VS Code
 .vscode/
 *.code-workspace
 
-# IDEs
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
 # Logs
 logs/
 *.log
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-
-# nyc test coverage
-.nyc_output
-
-# Grunt intermediate storage
-.grunt
 
 # Bower dependency directory
 bower_components
@@ -157,12 +92,6 @@ bower_components
 
 # Optional REPL history
 .node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
 
 # parcel-bundler cache
 .cache
@@ -177,58 +106,6 @@ temp/
 .expo/
 .expo-shared/
 
-# Flutter
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-build/
-flutter_*.png
-linked_*.ds
-unlinked.ds
-unlinked_spec.ds
-
-# Android
-*.apk
-*.ap_
-*.dex
-*.class
-local.properties
-.gradle/
-.gradletasknamecache
-.aar
-.ap_
-.aab
-
-# iOS
-*.mode1v3
-*.mode2v3
-*.moved-aside
-*.pbxuser
-*.perspectivev3
-**/*sync/
-.sconsign.dblite
-.tags*
-**/.vagrant/
-**/DerivedData/
-Icon?
-**/Pods/
-**/.symlinks/
-profile
-xcuserdata
-**/.generated/
-Flutter/App.framework
-Flutter/Flutter.framework
-Flutter/Flutter.podspec
-Flutter/Generated.xcconfig
-Flutter/app.flx
-Flutter/app.zip
-Flutter/flutter_assets/
-Flutter/flutter_export_environment.sh
-ServiceDefinitions.json
-Runner/GeneratedPluginRegistrant.*
 
 # Web-specific
 # Sass
@@ -246,43 +123,11 @@ Runner/GeneratedPluginRegistrant.*
 # Optional eslint cache
 .eslintcache
 
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
 # dotenv environment variables file
 .env.test
 
-# parcel-bundler cache
-.cache
-.parcel-cache
 
-# Next.js build output
-.next
-out
 
-# Nuxt.js build / generate output
-.nuxt
-dist
-
-# Gatsby files
-.cache/
-public
-
-# Storybook build outputs
-.out
-.storybook-out
 
 # Temporary folders
 tmp/
@@ -292,24 +137,3 @@ temp/
 config/keys.js
 config/config.json
 secrets.json
-
-# ML Models (large files)
-*.pkl
-*.joblib
-*.h5
-*.pb
-*.onnx
-models/
-checkpoints/
-
-# Data files
-data/
-datasets/
-*.csv
-*.json
-*.xml
-
-# Backup files
-*.bak
-*.backup
-*.old

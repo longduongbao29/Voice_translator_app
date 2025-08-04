@@ -49,7 +49,7 @@ INSERT INTO users (email, username, hashed_password, is_active)
 VALUES (
     'admin@translator.com', 
     'admin', 
-    '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewYPQm2eXFCfxSzm', 
+    '$2y$10$9/nbHwAOCP5PdwDD5jjD8eQPu/cUa0adT6s8sMXP9jCI/uuI1Hd3O', 
     true
 ) ON CONFLICT (email) DO NOTHING;
 

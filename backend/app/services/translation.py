@@ -7,12 +7,16 @@ import httpx
 from langdetect import detect, detect_langs
 from app.database import get_redis
 from app.schemas import TranslationResponse, LanguageDetectionResponse
+from app.utils.logger import Logger
+
+logger = Logger(__name__)
 
 class TranslationService:
     def __init__(self):
         self.google_translator = Translator()
         self.redis_client = get_redis()
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        logger.info("Translation service initialized")
         
     def _generate_cache_key(self, text: str, source_lang: str, target_lang: str, engine: str) -> str:
         """Generate cache key for translation"""
@@ -23,26 +27,38 @@ class TranslationService:
         """Cache translation result"""
         try:
             self.redis_client.setex(cache_key, expire_time, json.dumps(translation))
+            logger.debug(f"Translation cached with key: {cache_key}")
         except Exception as e:
-            print(f"Cache error: {e}")
+            logger.error(f"Cache error: {e}")
     
     def _get_cached_translation(self, cache_key: str) -> Optional[dict]:
         """Get cached translation"""
         try:
             cached = self.redis_client.get(cache_key)
             if cached:
+                logger.debug(f"Translation cache hit: {cache_key}")
                 return json.loads(cached)
+            else:
+                logger.debug(f"Translation cache miss: {cache_key}")
         except Exception as e:
-            print(f"Cache retrieval error: {e}")
+            logger.error(f"Cache retrieval error: {e}")
         return None
     
     async def translate_with_google(self, text: str, source_lang: str, target_lang: str) -> TranslationResponse:
         """Translate using Google Translate"""
+        logger.log_translation_request(
+            source_lang=source_lang,
+            target_lang=target_lang,
+            text_length=len(text),
+            translation_service="google"
+        )
+        
         cache_key = self._generate_cache_key(text, source_lang, target_lang, "google")
         
         # Check cache first
         cached = self._get_cached_translation(cache_key)
         if cached:
+            logger.info("Returning cached Google translation")
             return TranslationResponse(**cached)
         
         try:
@@ -57,10 +73,11 @@ class TranslationService:
                     dest=target_lang
                 )
             
+            logger.debug("Starting Google translation")
             loop = asyncio.get_event_loop()
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 result = await loop.run_in_executor(executor, sync_translate)
-            
+            result = await result
             translation_data = {
                 "source_text": text,
                 "translated_text": result.text,
@@ -73,9 +90,13 @@ class TranslationService:
             # Cache result
             self._cache_translation(cache_key, translation_data)
             
+            logger.info(f"Google translation completed: {source_lang} -> {target_lang}")
             return TranslationResponse(**translation_data)
             
         except Exception as e:
+            logger.error(f"Google translation error: {str(e)}", 
+                        source_lang=source_lang, 
+                        target_lang=target_lang)
             raise Exception(f"Google translation error: {str(e)}")
     
     async def translate_with_openai(self, text: str, source_lang: str, target_lang: str) -> TranslationResponse:
