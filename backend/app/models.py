@@ -10,7 +10,10 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+    full_name = Column(String, nullable=True)
+    avatar = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
+    preferences = Column(Text, nullable=True)  # JSON stored as text for user preferences
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -24,6 +27,7 @@ class Translation(Base):
     source_language = Column(String(10), nullable=False)
     target_language = Column(String(10), nullable=False)
     translation_engine = Column(String(50), default="google")  # google, openai, local
+    is_favorite = Column(Boolean, default=False)  # Flag for saved translations
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class SupportedLanguage(Base):

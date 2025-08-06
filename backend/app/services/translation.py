@@ -168,23 +168,60 @@ class TranslationService:
         except Exception as e:
             raise Exception(f"OpenAI translation error: {str(e)}")
     
+    def _generate_detection_cache_key(self, text: str) -> str:
+        """Generate cache key for language detection"""
+        # Sử dụng mẫu ngắn hơn để tăng tỷ lệ cache hit
+        sample = text[:100] if len(text) > 100 else text
+        return f"langdetect:{hashlib.md5(sample.encode()).hexdigest()}"
+        
     def detect_language(self, text: str) -> LanguageDetectionResponse:
         """Detect language of text"""
+        if not text.strip():
+            return LanguageDetectionResponse(
+                detected_language="unknown",
+                confidence=0.0
+            )
+        
+        # Với văn bản quá ngắn, việc phát hiện có thể không đáng tin cậy
+        if len(text.strip()) < 5:
+            return LanguageDetectionResponse(
+                detected_language="en",  # Mặc định là tiếng Anh cho văn bản rất ngắn
+                confidence=0.5
+            )
+        
+        # Kiểm tra cache trước
+        cache_key = self._generate_detection_cache_key(text)
+        cached = self._get_cached_translation(cache_key)
+        if cached:
+            return LanguageDetectionResponse(**cached)
+        
         try:
+            # Sử dụng langdetect
             detections = detect_langs(text)
             if detections:
                 best_detection = detections[0]
-                return LanguageDetectionResponse(
-                    detected_language=best_detection.lang,
-                    confidence=best_detection.prob
-                )
+                
+                # Cache kết quả
+                detection_data = {
+                    "detected_language": best_detection.lang,
+                    "confidence": best_detection.prob
+                }
+                self._cache_translation(cache_key, detection_data, expire_time=86400)  # Cache trong 24 giờ
+                
+                return LanguageDetectionResponse(**detection_data)
             else:
+                # Fallback
                 return LanguageDetectionResponse(
-                    detected_language="unknown",
-                    confidence=0.0
+                    detected_language="en",  # Mặc định là tiếng Anh nếu phát hiện thất bại
+                    confidence=0.5
                 )
         except Exception as e:
-            raise Exception(f"Language detection error: {str(e)}")
+            logger.error(f"Language detection error: {str(e)}")
+            # Fallback trong trường hợp lỗi
+            return LanguageDetectionResponse(
+                detected_language="en",
+                confidence=0.3
+            )
     
     def get_supported_languages(self) -> dict:
         """Get list of supported languages"""

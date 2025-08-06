@@ -9,14 +9,29 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    full_name: Optional[str] = None
+
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    avatar: Optional[str] = None
 
 class UserResponse(UserBase):
     id: int
+    full_name: Optional[str] = None
+    avatar: Optional[str] = None
     is_active: bool
     created_at: datetime
     
     class Config:
         from_attributes = True
+
+class UserPreferences(BaseModel):
+    default_source_language: Optional[str] = "auto"
+    default_target_language: Optional[str] = "en"
+    preferred_engine: Optional[str] = "google"
+    theme: Optional[str] = "light"
+    auto_detect: Optional[bool] = True
 
 # Translation schemas
 class TranslationRequest(BaseModel):
@@ -32,11 +47,15 @@ class TranslationResponse(BaseModel):
     source_language: str
     target_language: str
     translation_engine: str
+    is_favorite: Optional[bool] = False
     confidence: Optional[float] = None
     created_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
+
+class TranslationFavoriteUpdate(BaseModel):
+    is_favorite: bool
 
 # Language schemas
 class LanguageResponse(BaseModel):

@@ -1,7 +1,11 @@
 import os
+import sys
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Add parent directory to path so we can import app
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config

@@ -49,7 +49,7 @@ class SpeechToTextService:
                     if  avg_logprob is not None and \
                         avg_logprob > -0.5 and \
                         no_speech_prob is not None and \
-                        no_speech_prob < 0.5:
+                        no_speech_prob < 0.15:
                         fulltext += segment.get("text", "").strip() + " "
                         
                 if fulltext:
