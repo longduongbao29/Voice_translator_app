@@ -44,7 +44,6 @@ function App() {
     { code: 'hi', name: 'Hindi', native_name: 'हिन्दी', supports_offline: true }
   ]);
   // const [loading, setLoading] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     // Only fetch from API if backend is available
@@ -71,9 +70,7 @@ function App() {
     <AuthProvider>
       <Router>
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-          <Header
-            onOpenSettings={() => setIsSettingsOpen(true)}
-          />
+          <Header />
           <main className="container mx-auto px-4 py-8">
             <Routes>
               <Route
@@ -81,8 +78,6 @@ function App() {
                 element={
                   <TranslatorInterface
                     languages={languages}
-                    isSettingsOpen={isSettingsOpen}
-                    onCloseSettings={() => setIsSettingsOpen(false)}
                   />
                 }
               />
@@ -122,12 +117,16 @@ function App() {
             </Routes>
           </main>
           <Toaster
-            position="top-right"
+            position="top-center"
             toastOptions={{
               duration: 4000,
               style: {
                 background: '#363636',
                 color: '#fff',
+                maxWidth: '400px',
+                textAlign: 'center',
+                fontSize: '15px',
+                borderRadius: '8px',
               },
               success: {
                 duration: 3000,

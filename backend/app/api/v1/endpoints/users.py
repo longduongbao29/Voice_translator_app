@@ -197,9 +197,7 @@ async def get_user_preferences(
         return UserPreferences(
             default_source_language=preferences.get("default_source_language", "auto"),
             default_target_language=preferences.get("default_target_language", "en"),
-            preferred_engine=preferences.get("preferred_engine", "google"),
-            theme=preferences.get("theme", "light"),
-            auto_detect=preferences.get("auto_detect", True)
+            preferred_engine=preferences.get("preferred_engine", "google")
         )
     except Exception as e:
         raise HTTPException(
@@ -237,8 +235,16 @@ async def update_user_preferences(
                 detail="User not found"
             )
         
-        # Update preferences
-        user.preferences = preferences.dict(exclude_none=True)
+        # Update preferences - using model_dump for Pydantic v2 compatibility
+        # or dict() for older versions
+        try:
+            # For Pydantic v2
+            preferences_dict = preferences.model_dump(exclude_none=True)
+        except AttributeError:
+            # For Pydantic v1
+            preferences_dict = preferences.dict(exclude_none=True)
+            
+        user.preferences = preferences_dict
         db.commit()
         db.refresh(user)
         

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import { Mic, MicOff, Volume2, VolumeX, Copy, ArrowLeftRight, Loader2, X, Star } from 'lucide-react';
 import { Language, TranslationRequest, TranslationResponse } from '../types/index';
-import { translationApi, speechToTextApi } from '../services/api.ts';
+import { translationApi, speechToTextApi, userApi } from '../services/api.ts';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis.ts';
 import { useAudioRecorder } from '../hooks/useAudioRecorder.ts';
 import { useAuth } from '../context/AuthContext.tsx';
@@ -11,14 +11,10 @@ import TextArea from './TextArea.tsx';
 
 interface TranslatorInterfaceProps {
   languages: Language[];
-  isSettingsOpen?: boolean;
-  onCloseSettings?: () => void;
 }
 
 const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
-  languages,
-  isSettingsOpen = false,
-  onCloseSettings
+  languages
 }) => {
   const [sourceText, setSourceText] = useState('');
   const [translatedText, setTranslatedText] = useState('');
@@ -36,7 +32,34 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
 
   const speechSynthesis = useSpeechSynthesis();
   const audioRecorder = useAudioRecorder();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+
+  // Load user preferences after login
+  useEffect(() => {
+    const loadUserPreferences = async () => {
+      if (isAuthenticated && user) {
+        try {
+          const result = await userApi.getPreferences();
+          if (result.success && result.data) {
+            // Apply user preferences
+            if (result.data.default_source_language) {
+              setSourceLanguage(result.data.default_source_language);
+            }
+            if (result.data.default_target_language) {
+              setTargetLanguage(result.data.default_target_language);
+            }
+            if (result.data.preferred_engine) {
+              setTranslationEngine(result.data.preferred_engine as 'google' | 'openai');
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load user preferences:', error);
+        }
+      }
+    };
+
+    loadUserPreferences();
+  }, [isAuthenticated, user]);
 
   // Handle recorder errors
   useEffect(() => {
@@ -268,46 +291,6 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 p-4">
-      {/* Settings Modal */}
-      {isSettingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg p-6 min-w-[400px] max-w-md relative">
-            <button
-              className="absolute top-2 right-2 p-1 rounded hover:bg-gray-100"
-              onClick={onCloseSettings}
-              title="Close"
-            >
-              <span className="text-xl">×</span>
-            </button>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Settings</h2>
-
-            {/* Translation Engine */}
-            <div className="mb-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Translation Engine</h3>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setTranslationEngine('google')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${translationEngine === 'google'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                >
-                  Google Translate
-                </button>
-                <button
-                  onClick={() => setTranslationEngine('openai')}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${translationEngine === 'openai'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                >
-                  OpenAI
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       {/* Language Selection */}
 
       <div className="bg-white rounded-lg shadow-md p-4">
@@ -367,7 +350,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
                   audioRecorder.isRecording
                     ? 'Stop recording'
                     : sourceLanguage === 'auto'
-                      ? 'Voice input not available with auto-detect language'
+                      ? 'Voice input requires selecting a specific language (auto-detect not supported)'
                       : 'Start recording'
                 }
                 disabled={isProcessingAudio || sourceLanguage === 'auto'}
@@ -424,16 +407,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
             </div>
           )}
 
-          {sourceLanguage === 'auto' && !audioRecorder.isRecording && !isProcessingAudio && (
-            <div className="mt-2 text-sm text-amber-600 flex items-center gap-1">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-info">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
-              Voice input requires selecting a specific language (auto-detect not supported).
-            </div>
-          )}
+          {/* Warning message removed from here - now only shown in tooltip */}
         </div>
 
         {/* Translated Text */}
@@ -447,10 +421,10 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
                   onClick={toggleFavoriteTranslation}
                   disabled={!isAuthenticated || isSaving || !translatedText}
                   className={`p-2.5 rounded-full ${!isAuthenticated
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : isFavorite
-                        ? 'bg-yellow-100 text-yellow-500 hover:bg-yellow-200'
-                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : isFavorite
+                      ? 'bg-yellow-100 text-yellow-500 hover:bg-yellow-200'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                     } transition-colors`}
                   title={!isAuthenticated ? 'Login to save translations' : isFavorite ? 'Remove from favorites' : 'Save translation'}
                 >

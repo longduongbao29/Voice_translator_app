@@ -8,10 +8,12 @@ import {
   LoginRequest,
   RegisterRequest,
   AuthResponse,
-  UserResponse
+  UserResponse,
+  CustomEndpoint,
+  WebhookIntegration
 } from '../types';
 
-// Sử dụng mặc định là localhost
+// Default to localhost
 const API_BASE_URL = 'http://localhost:8003/api/v1';
 
 const api = axios.create({
@@ -49,8 +51,6 @@ export const translationApi = {
   // Translate text
   translate: async (request: TranslationRequest): Promise<ApiResponse<TranslationResponse>> => {
     try {
-      console.log('Translation request:', request);
-
       const response = await api.post('/translate/translate', request);
       return {
         data: response.data,
@@ -64,44 +64,12 @@ export const translationApi = {
     }
   },
 
-  // Detect language
-  detectLanguage: async (text: string): Promise<ApiResponse<LanguageDetectionResponse>> => {
+  // Get translation history
+  getHistory: async (page: number = 1, limit: number = 10): Promise<ApiResponse<any>> => {
     try {
-      const response = await api.post('/translate/detect-language', { text });
+      const response = await api.get(`/translate/history?page=${page}&limit=${limit}`);
       return {
         data: response.data,
-        success: true,
-      };
-    } catch (error: any) {
-      return {
-        error: error.response?.data?.detail || error.message || 'Language detection failed',
-        success: false,
-      };
-    }
-  },
-
-  // Get supported languages
-  getLanguages: async (): Promise<ApiResponse<Language[]>> => {
-    try {
-      const response = await api.get('/translate/languages');
-      return {
-        data: response.data.languages,
-        success: true,
-      };
-    } catch (error: any) {
-      return {
-        error: error.response?.data?.detail || error.message || 'Failed to fetch languages',
-        success: false,
-      };
-    }
-  },
-
-  // Get translation history
-  getHistory: async (skip = 0, limit = 100): Promise<ApiResponse<TranslationResponse[]>> => {
-    try {
-      const response = await api.get(`/translate/history?skip=${skip}&limit=${limit}`);
-      return {
-        data: response.data.translations,
         success: true,
       };
     } catch (error: any) {
@@ -113,11 +81,11 @@ export const translationApi = {
   },
 
   // Get favorite translations
-  getFavorites: async (skip = 0, limit = 100): Promise<ApiResponse<TranslationResponse[]>> => {
+  getFavorites: async (page: number = 1, limit: number = 10): Promise<ApiResponse<any>> => {
     try {
-      const response = await api.get(`/translate/favorites?skip=${skip}&limit=${limit}`);
+      const response = await api.get(`/translate/favorites?page=${page}&limit=${limit}`);
       return {
-        data: response.data.favorites,
+        data: response.data,
         success: true,
       };
     } catch (error: any) {
@@ -128,12 +96,10 @@ export const translationApi = {
     }
   },
 
-  // Toggle favorite status for a translation
+  // Toggle favorite status
   toggleFavorite: async (translationId: number, isFavorite: boolean): Promise<ApiResponse<any>> => {
     try {
-      const response = await api.put(`/translate/favorite/${translationId}`, {
-        is_favorite: isFavorite
-      });
+      const response = await api.put(`/translate/${translationId}/favorite`, { is_favorite: isFavorite });
       return {
         data: response.data,
         success: true,
@@ -146,17 +112,48 @@ export const translationApi = {
     }
   },
 
-  // Clear all translation history
-  clearHistory: async (): Promise<ApiResponse<any>> => {
+  // Delete translation history item
+  deleteHistoryItem: async (translationId: number): Promise<ApiResponse<any>> => {
     try {
-      const response = await api.delete('/translate/history');
+      await api.delete(`/translate/${translationId}`);
+      return {
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to delete history item',
+        success: false,
+      };
+    }
+  },
+
+  // Get supported languages
+  getLanguages: async (): Promise<ApiResponse<Language[]>> => {
+    try {
+      const response = await api.get('/translate/languages');
       return {
         data: response.data,
         success: true,
       };
     } catch (error: any) {
       return {
-        error: error.response?.data?.detail || error.message || 'Failed to clear history',
+        error: error.response?.data?.detail || error.message || 'Failed to fetch languages',
+        success: false,
+      };
+    }
+  },
+
+  // Detect language of text
+  detectLanguage: async (text: string): Promise<ApiResponse<LanguageDetectionResponse>> => {
+    try {
+      const response = await api.post('/translate/detect', { text });
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Language detection failed',
         success: false,
       };
     }
@@ -164,107 +161,45 @@ export const translationApi = {
 };
 
 export const speechToTextApi = {
-  // Speech to text từ audio file
-  transcribeAudio: async (audioBlob: Blob, language: string = 'auto'): Promise<ApiResponse<{ text: string; language?: string }>> => {
+  // Transcribe audio to text
+  transcribeAudio: async (audioBlob: Blob, language: string = 'auto'): Promise<ApiResponse<any>> => {
     try {
-      // Validate the audio blob
-      if (!audioBlob || audioBlob.size === 0) {
-        throw new Error('Invalid audio data: empty blob');
-      }
-
       const formData = new FormData();
-
-      // Ensure the file has a proper extension
-      const fileName = `recording-${Date.now()}.webm`;
-
-      // Add form data fields
-      formData.append('audio', audioBlob, fileName);
+      formData.append('audio_file', audioBlob, 'audio.webm');
       formData.append('language', language);
-      formData.append('model_name', 'whisper-large-v3');
-
-      console.log('Sending audio for transcription:');
-      console.log('- Language:', language);
-      console.log('- File size:', audioBlob.size);
-      console.log('- File type:', audioBlob.type);
-      console.log('- File name:', fileName);
 
       const response = await api.post('/speech2text/transcribe', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 60000, // 60 seconds timeout for audio processing
       });
-
-      console.log('Transcription response:', response.data);
-
       return {
         data: response.data,
         success: true,
       };
     } catch (error: any) {
-      console.error('Speech to text error:', error);
-
-      // Log more detailed error information
-      if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response headers:', error.response.headers);
-        console.error('Response data:', error.response.data);
-      } else if (error.request) {
-        console.error('Request was made but no response received');
-      }
-
       return {
-        error: error.response?.data?.detail || error.message || 'Speech to text failed',
+        error: error.response?.data?.detail || error.message || 'Transcription failed',
         success: false,
       };
     }
   },
-
-  connect: (onMessage: (message: string) => void, onError?: (error: Event) => void) => {
-    // Ensure correct WebSocket URL for backend route /api/v1/ws/realtimestt
-    let wsUrl = API_BASE_URL.replace('http', 'ws');
-    wsUrl = wsUrl.replace(/\/api\/v1$/, '');
-    const ws = new WebSocket(`${wsUrl}/api/v1/ws/realtimestt`);
-
-    ws.onopen = () => {
-      console.log('WebSocket connection established');
-    };
-
-    ws.onmessage = (event) => {
-      onMessage(event.data);
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      if (onError) {
-        onError(error);
-      }
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket connection closed');
-    };
-
-    return ws;
-  },
 };
 
 export const authApi = {
-  // Login
-  login: async (credentials: LoginRequest): Promise<ApiResponse<AuthResponse>> => {
+  // Login user
+  login: async (loginData: LoginRequest): Promise<ApiResponse<AuthResponse>> => {
     try {
-      // Chuyển đổi thành FormData theo yêu cầu của OAuth2
       const formData = new FormData();
-      formData.append('username', credentials.username);
-      formData.append('password', credentials.password);
+      formData.append('username', loginData.username);
+      formData.append('password', loginData.password);
 
       const response = await api.post('/auth/login', formData, {
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'multipart/form-data',
         },
       });
 
-      // Save token to localStorage
       if (response.data.access_token) {
         localStorage.setItem('authToken', response.data.access_token);
       }
@@ -281,10 +216,10 @@ export const authApi = {
     }
   },
 
-  // Register
-  register: async (userData: RegisterRequest): Promise<ApiResponse<UserResponse>> => {
+  // Register user
+  register: async (registerData: RegisterRequest): Promise<ApiResponse<any>> => {
     try {
-      const response = await api.post('/auth/register', userData);
+      const response = await api.post('/auth/register', registerData);
       return {
         data: response.data,
         success: true,
@@ -297,15 +232,10 @@ export const authApi = {
     }
   },
 
-  // Logout
-  logout: (): void => {
-    localStorage.removeItem('authToken');
-  },
-
-  // Get current user
+  // Get current user info
   getCurrentUser: async (): Promise<ApiResponse<UserResponse>> => {
     try {
-      const response = await api.get('/auth/me');
+      const response = await api.get('/users/me');
       return {
         data: response.data,
         success: true,
@@ -316,6 +246,11 @@ export const authApi = {
         success: false,
       };
     }
+  },
+
+  // Logout user
+  logout: (): void => {
+    localStorage.removeItem('authToken');
   },
 };
 
@@ -337,7 +272,7 @@ export const userApi = {
   },
 
   // Update user profile
-  updateProfile: async (userData: Partial<UserResponse>): Promise<ApiResponse<UserResponse>> => {
+  updateProfile: async (userData: any): Promise<ApiResponse<any>> => {
     try {
       const response = await api.put('/users/me', userData);
       return {
@@ -353,7 +288,7 @@ export const userApi = {
   },
 
   // Upload avatar
-  uploadAvatar: async (file: File): Promise<ApiResponse<{ avatar_url: string }>> => {
+  uploadAvatar: async (file: File): Promise<ApiResponse<any>> => {
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -407,15 +342,165 @@ export const userApi = {
       };
     }
   },
+
+  // Developer API - Custom Endpoints
+  getCustomEndpoints: async (): Promise<ApiResponse<CustomEndpoint[]>> => {
+    try {
+      const response = await api.get('/developer/custom-endpoints');
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to fetch custom endpoints',
+        success: false,
+      };
+    }
+  },
+
+  getCustomEndpoint: async (id: number): Promise<ApiResponse<CustomEndpoint>> => {
+    try {
+      const response = await api.get(`/developer/custom-endpoints/${id}`);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to fetch custom endpoint',
+        success: false,
+      };
+    }
+  },
+
+  createCustomEndpoint: async (endpoint: CustomEndpoint): Promise<ApiResponse<CustomEndpoint>> => {
+    try {
+      const response = await api.post('/developer/custom-endpoints', endpoint);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to create custom endpoint',
+        success: false,
+      };
+    }
+  },
+
+  updateCustomEndpoint: async (id: number, endpoint: CustomEndpoint): Promise<ApiResponse<CustomEndpoint>> => {
+    try {
+      const response = await api.put(`/developer/custom-endpoints/${id}`, endpoint);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to update custom endpoint',
+        success: false,
+      };
+    }
+  },
+
+  deleteCustomEndpoint: async (id: number): Promise<ApiResponse<any>> => {
+    try {
+      await api.delete(`/developer/custom-endpoints/${id}`);
+      return {
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to delete custom endpoint',
+        success: false,
+      };
+    }
+  },
+
+  // Developer API - Webhooks
+  getWebhooks: async (): Promise<ApiResponse<WebhookIntegration[]>> => {
+    try {
+      const response = await api.get('/developer/webhooks');
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to fetch webhooks',
+        success: false,
+      };
+    }
+  },
+
+  getWebhook: async (id: number): Promise<ApiResponse<WebhookIntegration>> => {
+    try {
+      const response = await api.get(`/developer/webhooks/${id}`);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to fetch webhook',
+        success: false,
+      };
+    }
+  },
+
+  createWebhook: async (webhook: WebhookIntegration): Promise<ApiResponse<WebhookIntegration>> => {
+    try {
+      const response = await api.post('/developer/webhooks', webhook);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to create webhook',
+        success: false,
+      };
+    }
+  },
+
+  updateWebhook: async (id: number, webhook: WebhookIntegration): Promise<ApiResponse<WebhookIntegration>> => {
+    try {
+      const response = await api.put(`/developer/webhooks/${id}`, webhook);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to update webhook',
+        success: false,
+      };
+    }
+  },
+
+  deleteWebhook: async (id: number): Promise<ApiResponse<any>> => {
+    try {
+      await api.delete(`/developer/webhooks/${id}`);
+      return {
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to delete webhook',
+        success: false,
+      };
+    }
+  },
 };
 
 export const favoritesApi = {
-  // Get favorites
-  getFavorites: async (skip = 0, limit = 100): Promise<ApiResponse<TranslationResponse[]>> => {
+  // Get user favorites
+  getFavorites: async (): Promise<ApiResponse<TranslationResponse[]>> => {
     try {
-      const response = await api.get(`/translate/favorites?skip=${skip}&limit=${limit}`);
+      const response = await api.get('/translations/favorites');
       return {
-        data: response.data.favorites,
+        data: response.data,
         success: true,
       };
     } catch (error: any) {
@@ -426,19 +511,33 @@ export const favoritesApi = {
     }
   },
 
-  // Toggle favorite status
-  toggleFavorite: async (translationId: number, isFavorite: boolean): Promise<ApiResponse<any>> => {
+  // Add translation to favorites
+  addToFavorites: async (translationId: number): Promise<ApiResponse<any>> => {
     try {
-      const response = await api.put(`/translate/favorite/${translationId}`, {
-        is_favorite: isFavorite
-      });
+      const response = await api.post(`/translations/${translationId}/favorite`);
       return {
         data: response.data,
         success: true,
       };
     } catch (error: any) {
       return {
-        error: error.response?.data?.detail || error.message || 'Failed to update favorite status',
+        error: error.response?.data?.detail || error.message || 'Failed to add to favorites',
+        success: false,
+      };
+    }
+  },
+
+  // Remove translation from favorites
+  removeFromFavorites: async (translationId: number): Promise<ApiResponse<any>> => {
+    try {
+      const response = await api.delete(`/translations/${translationId}/favorite`);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to remove from favorites',
         success: false,
       };
     }

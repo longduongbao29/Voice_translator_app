@@ -5,7 +5,7 @@ import { TranslationResponse } from '../types';
 import { Clock, Star, Trash2, AlertTriangle } from 'lucide-react';
 
 const HistoryPage: React.FC = () => {
-    const { user, isAuthenticated } = useAuth();
+    const { isAuthenticated } = useAuth();
     const [translations, setTranslations] = useState<TranslationResponse[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);

@@ -30,8 +30,9 @@ class UserPreferences(BaseModel):
     default_source_language: Optional[str] = "auto"
     default_target_language: Optional[str] = "en"
     preferred_engine: Optional[str] = "google"
-    theme: Optional[str] = "light"
-    auto_detect: Optional[bool] = True
+    preferred_speech2text: Optional[str] = "google"
+    custom_endpoints_enabled: Optional[bool] = False
+    webhooks_enabled: Optional[bool] = False
 
 # Translation schemas
 class TranslationRequest(BaseModel):
@@ -79,3 +80,61 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+# Custom Endpoint schemas
+class CustomEndpointBase(BaseModel):
+    name: str
+    endpoint_type: str  # 'speech2text' or 'translation'
+    endpoint_url: str
+    api_key: Optional[str] = None
+    headers: Optional[dict] = None
+    is_active: Optional[bool] = True
+
+class CustomEndpointCreate(CustomEndpointBase):
+    pass
+
+class CustomEndpointUpdate(BaseModel):
+    name: Optional[str] = None
+    endpoint_url: Optional[str] = None
+    api_key: Optional[str] = None
+    headers: Optional[dict] = None
+    is_active: Optional[bool] = None
+
+class CustomEndpointResponse(CustomEndpointBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+# Webhook Integration schemas
+class WebhookIntegrationBase(BaseModel):
+    name: str
+    platform: str  # 'slack', 'discord', 'zalo', 'custom'
+    webhook_url: str
+    secret_key: Optional[str] = None
+    event_types: Optional[List[str]] = None
+    config: Optional[dict] = None
+    is_active: Optional[bool] = True
+
+class WebhookIntegrationCreate(WebhookIntegrationBase):
+    pass
+
+class WebhookIntegrationUpdate(BaseModel):
+    name: Optional[str] = None
+    webhook_url: Optional[str] = None
+    secret_key: Optional[str] = None
+    event_types: Optional[List[str]] = None
+    config: Optional[dict] = None
+    is_active: Optional[bool] = None
+
+class WebhookIntegrationResponse(WebhookIntegrationBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

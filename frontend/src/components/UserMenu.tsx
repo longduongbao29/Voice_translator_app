@@ -6,10 +6,9 @@ interface UserMenuProps {
     isOpen: boolean;
     onClose: () => void;
     anchorRef: React.RefObject<HTMLElement>;
-    onOpenSettings: () => void;
 }
 
-const UserMenu: React.FC<UserMenuProps> = ({ isOpen, onClose, anchorRef, onOpenSettings }) => {
+const UserMenu: React.FC<UserMenuProps> = ({ isOpen, onClose, anchorRef }) => {
     const { user, logout } = useAuth();
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -68,9 +67,9 @@ const UserMenu: React.FC<UserMenuProps> = ({ isOpen, onClose, anchorRef, onOpenS
                     <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
                         <User className="h-6 w-6 text-primary-600" />
                     </div>
-                    <div className="ml-3">
-                        <p className="text-sm font-medium text-secondary-900">{user?.fullName || user?.username}</p>
-                        <p className="text-xs text-secondary-500 truncate">{user?.email}</p>
+                    <div className="ml-3 overflow-hidden max-w-[180px]">
+                        <p className="text-sm font-medium text-secondary-900 truncate">{user?.full_name || user?.username}</p>
+                        <p className="text-xs text-secondary-500 truncate" title={user?.email || ""}>{user?.email}</p>
                     </div>
                 </div>
             </div>
@@ -104,16 +103,14 @@ const UserMenu: React.FC<UserMenuProps> = ({ isOpen, onClose, anchorRef, onOpenS
                     Bản dịch đã lưu
                 </a>
 
-                <button
-                    onClick={() => {
-                        onOpenSettings();
-                        onClose();
-                    }}
-                    className="flex w-full items-center px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-100 text-left"
+                <a
+                    href="/settings"
+                    onClick={onClose}
+                    className="flex items-center px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-100"
                 >
                     <Settings className="mr-3 h-4 w-4 text-secondary-500" />
                     Cài đặt
-                </button>
+                </a>
 
                 <div className="border-t border-secondary-100 my-1"></div>
 

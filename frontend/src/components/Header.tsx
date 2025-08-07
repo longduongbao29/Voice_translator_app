@@ -8,10 +8,9 @@ import UserMenu from './UserMenu.tsx';
 
 
 interface HeaderProps {
-  onOpenSettings: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
+const Header: React.FC<HeaderProps> = () => {
   const { isAuthenticated, user } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
@@ -96,7 +95,6 @@ const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
           isOpen={showUserMenu}
           onClose={() => setShowUserMenu(false)}
           anchorRef={userButtonRef}
-          onOpenSettings={onOpenSettings}
         />
       )}
     </header>

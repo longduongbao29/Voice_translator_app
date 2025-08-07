@@ -95,7 +95,33 @@ export interface UserPreferences {
   default_source_language?: string;
   default_target_language?: string;
   preferred_engine?: string;
-  theme?: string;
-  auto_detect?: boolean;
+  preferred_speech2text?: string;
+  custom_endpoints_enabled?: boolean;
+  webhooks_enabled?: boolean;
+}
+
+export interface CustomEndpoint {
+  id?: number;
+  name: string;
+  endpoint_type: 'speech2text' | 'translation';
+  endpoint_url: string;
+  api_key?: string;
+  headers?: Record<string, string>;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WebhookIntegration {
+  id?: number;
+  name: string;
+  platform: 'slack' | 'discord' | 'zalo' | 'custom';
+  webhook_url: string;
+  secret_key?: string;
+  event_types?: string[];
+  config?: Record<string, any>;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
