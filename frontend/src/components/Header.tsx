@@ -1,7 +1,8 @@
 
 import React, { useState, useRef } from 'react';
-import { Globe, Languages, ChevronDown, LogIn, User } from 'lucide-react';
+import { Globe, Languages, ChevronDown, LogIn, User, Mic, WholeWord } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
+import { Link } from 'react-router-dom';
 import LoginModal from './LoginModal.tsx';
 import RegisterModal from './RegisterModal.tsx';
 import UserMenu from './UserMenu.tsx';
@@ -60,6 +61,22 @@ const Header: React.FC<HeaderProps> = () => {
               <Languages className="w-5 h-5" />
               <span className="text-sm font-medium">Multi-language Support</span>
             </div>
+            <Link
+              to="/"
+              className="flex items-center space-x-2 px-3 py-2 rounded-full hover:bg-secondary-100 transition-colors"
+            >
+              <WholeWord className="w-5 h-5" />
+              <span className="text-sm font-medium hidden sm:inline">Text Translate</span>
+            </Link>
+
+            <Link
+              to="/voice-translate"
+              className="flex items-center space-x-2 px-3 py-2 rounded-full hover:bg-secondary-100 transition-colors"
+            >
+              <Mic className="w-5 h-5" />
+              <span className="text-sm font-medium hidden sm:inline">Voice Translate</span>
+            </Link>
+
             <button
               className="flex items-center space-x-2 px-3 py-2 rounded-full hover:bg-secondary-100 transition-colors"
               onClick={handleAuthClick}

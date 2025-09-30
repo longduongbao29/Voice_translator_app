@@ -68,7 +68,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ isOpen, onClose, anchorRef }) => {
                         <User className="h-6 w-6 text-primary-600" />
                     </div>
                     <div className="ml-3">
-                        <p className="text-sm font-medium text-secondary-900">{user?.fullName || user?.username}</p>
+                        <p className="text-sm font-medium text-secondary-900">{user?.full_name || user?.username}</p>
                         <p className="text-xs text-secondary-500 truncate">{user?.email}</p>
                     </div>
                 </div>

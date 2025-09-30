@@ -8,6 +8,7 @@ import ProfilePage from './components/ProfilePage.tsx';
 import HistoryPage from './components/HistoryPage.tsx';
 import FavoritesPage from './components/FavoritesPage.tsx';
 import SettingsPage from './components/SettingsPage.tsx';
+import VoiceTranslatePage from './components/VoiceTranslatePage.tsx';
 import { Language } from './types';
 import AuthProvider from './context/AuthContext.tsx';
 import { useAuth } from './context/AuthContext.tsx';
@@ -112,6 +113,10 @@ function App() {
                     <SettingsPage />
                   </ProtectedRoute>
                 }
+              />
+              <Route
+                path="/voice-translate"
+                element={<VoiceTranslatePage />}
               />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>

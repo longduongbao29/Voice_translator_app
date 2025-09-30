@@ -65,11 +65,13 @@ export const translationApi = {
   },
 
   // Get translation history
-  getHistory: async (page: number = 1, limit: number = 10): Promise<ApiResponse<any>> => {
+  // `skip` is the number of items to skip (offset). Backend returns { translations: [...] }
+  getHistory: async (skip: number = 0, limit: number = 10): Promise<ApiResponse<any>> => {
     try {
-      const response = await api.get(`/translate/history?page=${page}&limit=${limit}`);
+      const response = await api.get(`/translate/history?skip=${skip}&limit=${limit}`);
+      const translations = response.data?.translations ?? response.data;
       return {
-        data: response.data,
+        data: translations,
         success: true,
       };
     } catch (error: any) {
@@ -99,7 +101,7 @@ export const translationApi = {
   // Toggle favorite status
   toggleFavorite: async (translationId: number, isFavorite: boolean): Promise<ApiResponse<any>> => {
     try {
-      const response = await api.put(`/translate/${translationId}/favorite`, { is_favorite: isFavorite });
+      const response = await api.put(`/translate/favorite/${translationId}`, { is_favorite: isFavorite });
       return {
         data: response.data,
         success: true,
@@ -146,7 +148,7 @@ export const translationApi = {
   // Detect language of text
   detectLanguage: async (text: string): Promise<ApiResponse<LanguageDetectionResponse>> => {
     try {
-      const response = await api.post('/translate/detect', { text });
+      const response = await api.post('/translate/detect-language', { text });
       return {
         data: response.data,
         success: true,
@@ -162,17 +164,28 @@ export const translationApi = {
 
 export const speechToTextApi = {
   // Transcribe audio to text
-  transcribeAudio: async (audioBlob: Blob, language: string = 'auto'): Promise<ApiResponse<any>> => {
+  transcribeAudio: async (audioBlob: Blob | File, targetLanguage: string = 'auto'): Promise<ApiResponse<any>> => {
     try {
       const formData = new FormData();
-      formData.append('audio_file', audioBlob, 'audio.webm');
-      formData.append('language', language);
+      // Backend expects field name 'audio' (UploadFile = File(... ) param name)
+      // preserve filename if File provided
+      if ((audioBlob as File).name) {
+        formData.append('audio', audioBlob as File, (audioBlob as File).name);
+      } else {
+        formData.append('audio', audioBlob as Blob, 'audio.webm');
+      }
+      // Send the desired target language for translation
+      formData.append('target_language', targetLanguage);
 
-      const response = await api.post('/speech2text/transcribe', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Use axios directly and set multipart/form-data so the backend receives a proper form
+      const url = `${API_BASE_URL}/speech2text/transcribe`;
+      const token = localStorage.getItem('authToken');
+      const headers: Record<string, string> = {
+        'Content-Type': 'multipart/form-data',
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await axios.post(url, formData, { headers });
       return {
         data: response.data,
         success: true,
@@ -498,9 +511,10 @@ export const favoritesApi = {
   // Get user favorites
   getFavorites: async (): Promise<ApiResponse<TranslationResponse[]>> => {
     try {
-      const response = await api.get('/translations/favorites');
+      const response = await api.get('/translate/favorites');
+      const favorites = response.data?.favorites ?? response.data;
       return {
-        data: response.data,
+        data: favorites,
         success: true,
       };
     } catch (error: any) {
@@ -514,7 +528,7 @@ export const favoritesApi = {
   // Add translation to favorites
   addToFavorites: async (translationId: number): Promise<ApiResponse<any>> => {
     try {
-      const response = await api.post(`/translations/${translationId}/favorite`);
+      const response = await api.post(`/translate/favorite/${translationId}`);
       return {
         data: response.data,
         success: true,
@@ -530,7 +544,7 @@ export const favoritesApi = {
   // Remove translation from favorites
   removeFromFavorites: async (translationId: number): Promise<ApiResponse<any>> => {
     try {
-      const response = await api.delete(`/translations/${translationId}/favorite`);
+      const response = await api.delete(`/translate/favorite/${translationId}`);
       return {
         data: response.data,
         success: true,

@@ -227,9 +227,33 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
     }
   };
 
+  const mapToSpeechLang = (langCode: string) => {
+    // If already a locale like en-US or zh-CN, use it. If short code like 'en', map to a sensible default.
+    if (!langCode) return 'en-US';
+    if (langCode.includes('-')) return langCode;
+
+    const short = langCode.toLowerCase();
+    const mapping: Record<string, string> = {
+      en: 'en-US',
+      es: 'es-ES',
+      fr: 'fr-FR',
+      de: 'de-DE',
+      zh: 'zh-CN',
+      ja: 'ja-JP',
+      ko: 'ko-KR',
+      vi: 'vi-VN',
+      ru: 'ru-RU',
+      it: 'it-IT',
+      pt: 'pt-PT',
+    };
+
+    return mapping[short] || `${short}-${short.toUpperCase()}`;
+  };
+
   const handleSpeakText = (text: string, language: string) => {
     if (text.trim()) {
-      speechSynthesis.speak(text, language);
+      const speechLang = mapToSpeechLang(language || targetLanguage || 'en');
+      speechSynthesis.speak(text, speechLang);
     }
   };
 
@@ -341,7 +365,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
               <button
                 onClick={toggleVoiceRecognition}
                 className={`p-2.5 rounded-full transition-all duration-200 shadow-sm ${audioRecorder.isRecording
-                  ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse'
+                  ? 'bg-red-500 text-white hover:bg-red-600'
                   : sourceLanguage === 'auto'
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -363,6 +387,20 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
                   <Mic className="w-5 h-5" />
                 )}
               </button>
+              {typeof window !== 'undefined' && window.speechSynthesis && (
+                <button
+                  onClick={() => handleSpeakText(sourceText, sourceLanguage === 'auto' && detectedLanguage ? detectedLanguage : sourceLanguage)}
+                  disabled={!sourceText || window.speechSynthesis.speaking}
+                  className="p-2.5 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Read source aloud"
+                >
+                  {window.speechSynthesis.speaking ? (
+                    <VolumeX className="w-4 h-4" />
+                  ) : (
+                    <Volume2 className="w-4 h-4" />
+                  )}
+                </button>
+              )}
               <button
                 onClick={() => handleCopyText(sourceText)}
                 disabled={!sourceText}
@@ -395,7 +433,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
 
           {(audioRecorder.isRecording || isProcessingAudio) && (
             <div className="mt-2 flex items-center space-x-2 text-sm">
-              <div className={`w-2 h-2 rounded-full ${audioRecorder.isRecording ? 'bg-red-500 animate-pulse' : 'bg-yellow-500'}`}></div>
+              <div className={`w-2 h-2 rounded-full ${audioRecorder.isRecording ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
               <span className={`${audioRecorder.isRecording ? 'text-red-600' : 'text-yellow-600'}`}>
                 {audioRecorder.isRecording ? 'Recording...' : 'Processing...'}
               </span>
