@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext.tsx';
-import { LogOut, History, User, Settings, BookOpen, ChevronDown } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext.tsx';
+import { LogOut, History, User, Settings, BookOpen } from 'lucide-react';
 
 interface UserMenuProps {
     isOpen: boolean;
@@ -67,9 +67,9 @@ const UserMenu: React.FC<UserMenuProps> = ({ isOpen, onClose, anchorRef }) => {
                     <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
                         <User className="h-6 w-6 text-primary-600" />
                     </div>
-                    <div className="ml-3">
-                        <p className="text-sm font-medium text-secondary-900">{user?.full_name || user?.username}</p>
-                        <p className="text-xs text-secondary-500 truncate">{user?.email}</p>
+                    <div className="ml-3 overflow-hidden max-w-[180px]">
+                        <p className="text-sm font-medium text-secondary-900 truncate">{user?.full_name || user?.username}</p>
+                        <p className="text-xs text-secondary-500 truncate" title={user?.email || ""}>{user?.email}</p>
                     </div>
                 </div>
             </div>
@@ -77,7 +77,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ isOpen, onClose, anchorRef }) => {
             {/* Menu items */}
             <div className="py-1">
                 <a
-                    href="#profile"
+                    href="/profile"
                     onClick={onClose}
                     className="flex items-center px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-100"
                 >
@@ -86,7 +86,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ isOpen, onClose, anchorRef }) => {
                 </a>
 
                 <a
-                    href="#history"
+                    href="/history"
                     onClick={onClose}
                     className="flex items-center px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-100"
                 >
@@ -95,7 +95,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ isOpen, onClose, anchorRef }) => {
                 </a>
 
                 <a
-                    href="#saved"
+                    href="/favorites"
                     onClick={onClose}
                     className="flex items-center px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-100"
                 >
@@ -104,7 +104,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ isOpen, onClose, anchorRef }) => {
                 </a>
 
                 <a
-                    href="#settings"
+                    href="/settings"
                     onClick={onClose}
                     className="flex items-center px-4 py-2 text-sm text-secondary-700 hover:bg-secondary-100"
                 >
@@ -125,4 +125,5 @@ const UserMenu: React.FC<UserMenuProps> = ({ isOpen, onClose, anchorRef }) => {
         </div>
     );
 };
+
 export default UserMenu;

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { speechToTextApi } from '../services/api.ts';
 import { Mic } from 'lucide-react';
 import { useAudioRecorder } from '../hooks/useAudioRecorder.ts';
-import LanguageSelector from './LanguageSelector.tsx';
+import LanguageSelector from '../components/ui/LanguageSelector.tsx';
 import { translationApi } from '../services/api.ts';
 import { Language } from '../types/index.ts';
 // No micro animation effects required per request

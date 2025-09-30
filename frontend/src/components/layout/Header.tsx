@@ -1,10 +1,10 @@
 
 import React, { useState, useRef } from 'react';
 import { Globe, Languages, ChevronDown, LogIn, User, Mic, WholeWord } from 'lucide-react';
-import { useAuth } from '../context/AuthContext.tsx';
+import { useAuth } from '../../context/AuthContext.tsx';
 import { Link } from 'react-router-dom';
-import LoginModal from './LoginModal.tsx';
-import RegisterModal from './RegisterModal.tsx';
+import LoginModal from '../modals/LoginModal.tsx';
+import RegisterModal from '../modals/RegisterModal.tsx';
 import UserMenu from './UserMenu.tsx';
 
 

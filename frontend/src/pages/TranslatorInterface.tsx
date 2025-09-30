@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
-import { Mic, MicOff, Volume2, VolumeX, Copy, ArrowLeftRight, Loader2, X, Star } from 'lucide-react';
+import { Volume2, VolumeX, Copy, ArrowLeftRight, Loader2, X, Star } from 'lucide-react';
 import { Language, TranslationRequest, TranslationResponse } from '../types/index';
-import { translationApi, speechToTextApi, userApi } from '../services/api.ts';
+import { translationApi, userApi } from '../services/api.ts';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis.ts';
 import { useAudioRecorder } from '../hooks/useAudioRecorder.ts';
 import { useAuth } from '../context/AuthContext.tsx';
-import LanguageSelector from './LanguageSelector.tsx';
-import TextArea from './TextArea.tsx';
+import LanguageSelector from '../components/ui/LanguageSelector.tsx';
+import TextArea from '../components/ui/TextArea.tsx';
 
 interface TranslatorInterfaceProps {
   languages: Language[];
@@ -24,7 +24,6 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
   const [isTranslating, setIsTranslating] = useState(false);
   const [lastTranslation, setLastTranslation] = useState<TranslationResponse | null>(null);
   const [sttError, setSttError] = useState<string | undefined>(undefined);
-  const [isProcessingAudio, setIsProcessingAudio] = useState(false);
   const [detectedLanguage, setDetectedLanguage] = useState('');
   const [isDetectingLanguage, setIsDetectingLanguage] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -69,13 +68,13 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
     }
   }, [audioRecorder.error]);
   // Convert sourceLanguage to language code for speech recognition
-  const getSpeechLanguage = useCallback(() => {
-    // If auto-detect, pass 'auto' to backend to let Whisper auto-detect
-    if (sourceLanguage === 'auto') {
-      return 'auto';
-    }
-    return sourceLanguage;
-  }, [sourceLanguage]);
+  // const getSpeechLanguage = useCallback(() => {
+  //   // If auto-detect, pass 'auto' to backend to let Whisper auto-detect
+  //   if (sourceLanguage === 'auto') {
+  //     return 'auto';
+  //   }
+  //   return sourceLanguage;
+  // }, [sourceLanguage]);
 
   const handleClearText = () => {
     setSourceText('');
@@ -257,61 +256,61 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
     }
   };
 
-  const toggleVoiceRecognition = async () => {
-    if (audioRecorder.isRecording) {
-      // Stop recording and process audio
-      console.log('Stopping recording and processing audio...');
-      const audioBlob = await audioRecorder.stopRecording();
+  // const toggleVoiceRecognition = async () => {
+  //   if (audioRecorder.isRecording) {
+  //     // Stop recording and process audio
+  //     console.log('Stopping recording and processing audio...');
+  //     const audioBlob = await audioRecorder.stopRecording();
 
-      if (!audioBlob) {
-        toast.error('No audio data recorded');
-        return;
-      }
+  //     if (!audioBlob) {
+  //       toast.error('No audio data recorded');
+  //       return;
+  //     }
 
-      console.log('Audio recorded successfully', audioBlob.type, audioBlob.size);
+  //     console.log('Audio recorded successfully', audioBlob.type, audioBlob.size);
 
-      if (audioBlob.size < 1024) {
-        toast.error('Recording too short, please try again');
-        return;
-      }
+  //     if (audioBlob.size < 1024) {
+  //       toast.error('Recording too short, please try again');
+  //       return;
+  //     }
 
-      setIsProcessingAudio(true);
-      setSttError(undefined);
-      try {
-        // Ensure we have the proper MIME type
-        const properAudioBlob = audioBlob.type.includes('audio/')
-          ? audioBlob
-          : new Blob([audioBlob], { type: 'audio/webm' });
+  //     setIsProcessingAudio(true);
+  //     setSttError(undefined);
+  //     try {
+  //       // Ensure we have the proper MIME type
+  //       const properAudioBlob = audioBlob.type.includes('audio/')
+  //         ? audioBlob
+  //         : new Blob([audioBlob], { type: 'audio/webm' });
 
-        const response = await speechToTextApi.transcribeAudio(properAudioBlob, getSpeechLanguage());
-        if (response.success && response.data) {
-          setSourceText(response.data.text);
-          if (response.data.language && sourceLanguage === 'auto') {
-            setSourceLanguage(response.data.language);
-          }
-        } else {
-          const errorMessage = typeof response.error === 'object'
-            ? JSON.stringify(response.error)
-            : (response.error || 'Failed to transcribe audio.');
+  //       const response = await speechToTextApi.transcribeAudio(properAudioBlob, getSpeechLanguage());
+  //       if (response.success && response.data) {
+  //         setSourceText(response.data.text);
+  //         if (response.data.language && sourceLanguage === 'auto') {
+  //           setSourceLanguage(response.data.language);
+  //         }
+  //       } else {
+  //         const errorMessage = typeof response.error === 'object'
+  //           ? JSON.stringify(response.error)
+  //           : (response.error || 'Failed to transcribe audio.');
 
-          setSttError(errorMessage);
-          toast.error(errorMessage);
-        }
-      } catch (error: any) {
-        const errorMessage = 'Error processing audio: ' + (error.message || 'Unknown error');
-        console.error(errorMessage, error);
-        setSttError(errorMessage);
-        toast.error(errorMessage);
-      } finally {
-        setIsProcessingAudio(false);
-      }
-    } else {
-      // Start recording
-      setSttError(undefined);
-      await audioRecorder.startRecording();
-      toast.success('Recording started');
-    }
-  };
+  //         setSttError(errorMessage);
+  //         toast.error(errorMessage);
+  //       }
+  //     } catch (error: any) {
+  //       const errorMessage = 'Error processing audio: ' + (error.message || 'Unknown error');
+  //       console.error(errorMessage, error);
+  //       setSttError(errorMessage);
+  //       toast.error(errorMessage);
+  //     } finally {
+  //       setIsProcessingAudio(false);
+  //     }
+  //   } else {
+  //     // Start recording
+  //     setSttError(undefined);
+  //     await audioRecorder.startRecording();
+  //     toast.success('Recording started');
+  //   }
+  // };
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 p-4">
@@ -431,14 +430,14 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
             )}
           </div>
 
-          {(audioRecorder.isRecording || isProcessingAudio) && (
+          {/* {(audioRecorder.isRecording || isProcessingAudio) && (
             <div className="mt-2 flex items-center space-x-2 text-sm">
               <div className={`w-2 h-2 rounded-full ${audioRecorder.isRecording ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
               <span className={`${audioRecorder.isRecording ? 'text-red-600' : 'text-yellow-600'}`}>
                 {audioRecorder.isRecording ? 'Recording...' : 'Processing...'}
               </span>
             </div>
-          )}
+          )} */}
           {sttError && (
             <div className="mt-2 text-sm text-red-600">
               Error: {typeof sttError === 'object' ? JSON.stringify(sttError) : sttError}
