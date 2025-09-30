@@ -2,11 +2,22 @@ import os
 from typing import Optional
 import json
 import hashlib
-from googletrans import Translator, LANGUAGES
 import httpx
+import asyncio
+from googletrans import Translator, LANGUAGES
 from langdetect import detect, detect_langs
-from app.database import get_redis
-from app.schemas import TranslationResponse, LanguageDetectionResponse
+from sqlalchemy.orm import Session
+from app.database.postgres import get_db, get_redis
+from app.database.models import CustomEndpoint
+from app.api.schemas.schemas import TranslationResponse, LanguageDetectionResponse
+from app.utils.logger import Logger
+from typing import Optional
+import json
+import hashlib
+from googletrans import Translator, LANGUAGES
+from langdetect import detect, detect_langs
+from app.database.postgres import get_redis
+from app.api.schemas.schemas import TranslationResponse, LanguageDetectionResponse
 from app.utils.logger import Logger
 
 logger = Logger(__name__)
@@ -44,6 +55,99 @@ class TranslationService:
             logger.error(f"Cache retrieval error: {e}")
         return None
     
+    def _get_active_translation_endpoint(self, db: Session, user_id: Optional[int]) -> Optional[CustomEndpoint]:
+        """Get active custom translation endpoint for user"""
+        if not user_id:
+            return None
+            
+        try:
+            endpoint = db.query(CustomEndpoint).filter(
+                CustomEndpoint.user_id == user_id,
+                CustomEndpoint.endpoint_type == "translation",
+                CustomEndpoint.is_active == True
+            ).first()
+            
+            return endpoint
+        except Exception as e:
+            logger.error(f"Error querying custom endpoint: {e}")
+            return None
+    
+    async def _translate_with_custom_endpoint(self, endpoint: CustomEndpoint, text: str, 
+                                           source_lang: str, target_lang: str) -> TranslationResponse:
+        """Translate using custom endpoint"""
+        try:
+            headers = {
+                "Content-Type": "application/json"
+            }
+            
+            # Add custom headers if provided
+            if endpoint.headers:
+                headers.update(endpoint.headers)
+            
+            # Add API key if provided
+            if endpoint.api_key:
+                headers["Authorization"] = f"Bearer {endpoint.api_key}"
+            
+            # Prepare request data
+            data = {
+                "text": text,
+                "source_language": source_lang,
+                "target_language": target_lang
+            }
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    endpoint.endpoint_url,
+                    json=data,
+                    headers=headers,
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    
+                    # Assume the custom endpoint returns a similar structure
+                    return TranslationResponse(
+                        source_text=text,
+                        translated_text=result.get("translated_text", ""),
+                        source_language=result.get("source_language", source_lang),
+                        target_language=result.get("target_language", target_lang),
+                        translation_engine=f"custom_{endpoint.name}",
+                        confidence=result.get("confidence", 0.8)
+                    )
+                else:
+                    logger.error(f"Custom endpoint error: {response.status_code} - {response.text}")
+                    raise Exception(f"Custom endpoint returned status {response.status_code}")
+                    
+        except Exception as e:
+            logger.error(f"Custom endpoint translation error: {e}")
+            raise e
+
+    async def translate_text(self, text: str, source_lang: str, target_lang: str, 
+                           user_id: Optional[int] = None, db: Optional[Session] = None) -> TranslationResponse:
+        """
+        Main translation function that checks for custom endpoints first, 
+        then falls back to Google Translate
+        """
+        logger.info(f"Translation request: {source_lang} -> {target_lang}, user_id: {user_id}")
+        
+        # Try custom endpoint first if user is provided
+        if user_id and db:
+            custom_endpoint = self._get_active_translation_endpoint(db, user_id)
+            if custom_endpoint:
+                try:
+                    logger.info(f"Using custom endpoint: {custom_endpoint.name}")
+                    return await self._translate_with_custom_endpoint(
+                        custom_endpoint, text, source_lang, target_lang
+                    )
+                except Exception as e:
+                    logger.error(f"Custom endpoint failed, falling back to Google: {e}")
+                    # Continue to Google Translate fallback
+        
+        # Fallback to Google Translate
+        logger.info("Using Google Translate")
+        return await self.translate_with_google(text, source_lang, target_lang)
+        
     async def translate_with_google(self, text: str, source_lang: str, target_lang: str) -> TranslationResponse:
         """Translate using Google Translate"""
         logger.log_translation_request(
@@ -98,75 +202,6 @@ class TranslationService:
                         source_lang=source_lang, 
                         target_lang=target_lang)
             raise Exception(f"Google translation error: {str(e)}")
-    
-    async def translate_with_openai(self, text: str, source_lang: str, target_lang: str) -> TranslationResponse:
-        """Translate using OpenAI GPT"""
-        if not self.openai_api_key:
-            raise Exception("OpenAI API key not configured")
-            
-        cache_key = self._generate_cache_key(text, source_lang, target_lang, "openai")
-        
-        # Check cache first
-        cached = self._get_cached_translation(cache_key)
-        if cached:
-            return TranslationResponse(**cached)
-        
-        try:
-            # Language names for better prompt
-            lang_names = {
-                'vi': 'Vietnamese',
-                'en': 'English',
-                'fr': 'French',
-                'de': 'German',
-                'es': 'Spanish',
-                'ja': 'Japanese',
-                'ko': 'Korean',
-                'zh': 'Chinese'
-            }
-            
-            source_name = lang_names.get(source_lang, source_lang)
-            target_name = lang_names.get(target_lang, target_lang)
-            
-            prompt = f"Translate the following {source_name} text to {target_name}. Only return the translation, no explanations:\n\n{text}"
-            
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.openai_api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": "gpt-3.5-turbo",
-                        "messages": [{"role": "user", "content": prompt}],
-                        "max_tokens": 1000,
-                        "temperature": 0.3
-                    },
-                    timeout=30.0
-                )
-                
-                if response.status_code != 200:
-                    raise Exception(f"OpenAI API error: {response.status_code}")
-                
-                result = response.json()
-                translated_text = result["choices"][0]["message"]["content"].strip()
-                
-                translation_data = {
-                    "source_text": text,
-                    "translated_text": translated_text,
-                    "source_language": source_lang,
-                    "target_language": target_lang,
-                    "translation_engine": "openai",
-                    "confidence": 0.95
-                }
-                
-                # Cache result
-                self._cache_translation(cache_key, translation_data)
-                
-                return TranslationResponse(**translation_data)
-                
-        except Exception as e:
-            raise Exception(f"OpenAI translation error: {str(e)}")
     
     def _generate_detection_cache_key(self, text: str) -> str:
         """Generate cache key for language detection"""
@@ -228,4 +263,4 @@ class TranslationService:
         return LANGUAGES
 
 # Initialize service
-translation_service = TranslationService()
+

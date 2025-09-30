@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app.schemas import (
+from app.database.postgres import get_db
+from app.api.schemas.schemas import (
     CustomEndpointCreate, CustomEndpointResponse, CustomEndpointUpdate,
     WebhookIntegrationCreate, WebhookIntegrationResponse, WebhookIntegrationUpdate
 )
 from app.services.auth import verify_token, get_user_by_username
-from app.models import CustomEndpoint, WebhookIntegration
+from app.database.models import CustomEndpoint, WebhookIntegration
 from typing import List
 
 router = APIRouter()

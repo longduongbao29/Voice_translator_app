@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.api import api_router
-from app.database import engine
-from app.models import Base
+from app.database.postgres import engine
+from app.database.models import Base
 from app.utils.logger import logger, log_startup, log_shutdown
 from app.utils.middleware import LoggingMiddleware, ErrorLoggingMiddleware
 import os
@@ -64,7 +64,7 @@ async def health_check():
         logger.debug("Performing health check")
         
         # Test database connection
-        from app.database import SessionLocal
+        from backend.app.database.postgres import SessionLocal
         from sqlalchemy import text
         db = SessionLocal()
         db.execute(text("SELECT 1"))
@@ -72,7 +72,7 @@ async def health_check():
         logger.debug("Database connection verified")
         
         # Test Redis connection
-        from app.database import get_redis
+        from backend.app.database.postgres import get_redis
         redis_client = get_redis()
         redis_client.ping()
         logger.debug("Redis connection verified")

@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app.schemas import TranslationRequest, TranslationResponse, LanguageDetectionResponse, TranslationFavoriteUpdate
-from app.services.translation import translation_service
-from app.models import Translation
-from typing import Optional, List
+from app.database.postgres import get_db
+from app.api.schemas.schemas import TranslationRequest, TranslationResponse, LanguageDetectionResponse, TranslationFavoriteUpdate
+from app.services.translation import TranslationService
+from app.database.models import Translation
+from typing import Optional
 from datetime import datetime
-
+from app.utils.logger import Logger
+logger = Logger(__name__)
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
@@ -28,27 +29,14 @@ async def translate_text(
                 user = get_user_by_username(db, username)
                 if user:
                     user_id = user.id
-        
-        # Choose translation engine
-        if request.engine == "google":
-            result = await translation_service.translate_with_google(
-                request.text, 
-                request.source_language, 
-                request.target_language
-            )
-        elif request.engine == "openai":
-            result = await translation_service.translate_with_openai(
-                request.text, 
-                request.source_language, 
-                request.target_language
-            )
-        else:
-            result = await translation_service.translate_with_google(
-                request.text, 
-                request.source_language, 
-                request.target_language
-            )
-        
+        translation_service = TranslationService()
+        result = await translation_service.translate_text(
+            text=request.text,
+            source_lang=request.source_language,
+            target_lang=request.target_language,
+            user_id=user_id,
+            db=db
+        )
         # Save to database only if user is logged in
         db_translation = None
         if user_id is not None:
@@ -94,6 +82,7 @@ async def detect_language(request: dict):
                 detail="Text is required"
             )
         
+        translation_service = TranslationService()
         result = translation_service.detect_language(text)
         return result
         
@@ -107,6 +96,7 @@ async def detect_language(request: dict):
 async def get_supported_languages():
     """Get supported languages"""
     try:
+        translation_service = TranslationService()
         languages = translation_service.get_supported_languages()
         return {"languages": languages}
     except Exception as e:
@@ -182,6 +172,7 @@ async def get_favorite_translations(
             )
             
         user = get_user_by_username(db, username)
+        
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

@@ -1,15 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app.schemas import UserResponse, UserUpdate, UserPreferences
+from app.database.postgres import get_db
+from app.api.schemas.schemas import UserResponse, UserUpdate, UserPreferences
 from app.services.auth import verify_token, get_user_by_username
-from app.models import User
-from typing import Optional
 import os
 import shutil
 import uuid
-from datetime import datetime
 
 router = APIRouter()
 security = HTTPBearer(auto_error=False)

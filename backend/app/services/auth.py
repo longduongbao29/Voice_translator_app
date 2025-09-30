@@ -4,8 +4,8 @@ import os
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
-from app.models import User
-from app.schemas import UserCreate
+from app.database.models import User
+from app.api.schemas.schemas import UserCreate
 from app.utils.logger import Logger
 
 logger = Logger(__name__)

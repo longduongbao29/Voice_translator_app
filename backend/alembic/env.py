@@ -13,7 +13,7 @@ from sqlalchemy import pool
 from alembic import context
 
 # Import models for migrations
-from app.models import Base
+from backend.app.database.models import Base
 
 # this is the Alembic Config object
 config = context.config

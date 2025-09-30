@@ -1,12 +1,18 @@
 import os
 import json
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException
+from typing import Optional
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
+from app.database.postgres import get_db
+from app.services.translation import TranslationService
 
 from app.utils.logger import Logger
 from app.services.speech2text import SpeechToTextService
 
 logger = Logger(__name__)
 router = APIRouter()
+security = HTTPBearer(auto_error=False)
 
 @router.get("/test")
 async def test_endpoint():
@@ -14,48 +20,88 @@ async def test_endpoint():
 
 @router.post("/transcribe")
 async def transcribe_audio(
-    audio: UploadFile = File(...), 
-    language: str = Form("en"),
-    model_name: str = Form("whisper-large-v3")
+    audio: Optional[UploadFile] = File(None),
+    audio_file: Optional[UploadFile] = File(None),
+    language: str = Form("auto"),
+    target_language: str = Form("vi"),
+    model_name: str = Form("whisper-large-v3"),
+    db: Session = Depends(get_db),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ):
-        """Endpoint to transcribe audio file"""
+    """Endpoint to transcribe audio file, detect language and translate to target language"""
+    
+    # Get user_id from token if available
+    user_id = None
+    if credentials:
         try:
-            # Log incoming request details
-            logger.debug(f"Received transcription request. File: {audio.filename}, Content-Type: {audio.content_type}, Size: {audio.size}, Language: {language}, Model: {model_name}")
-            
-            # Read the audio data
-            audio_data = await audio.read()
-            logger.debug(f"Audio data read, size: {len(audio_data)} bytes")
-            
-            # Ensure the directory exists
-            public_dir = "app/public"
-            os.makedirs(public_dir, exist_ok=True)
-            
-            # Create temp file with unique name
-            import uuid
-            temp_filename = f"{public_dir}/temp_chunk_{uuid.uuid4()}.webm"
-            
-            # Initialize service and process audio
-            service = SpeechToTextService(model_name, temp_filename, language)
-            if not service.write_audio_chunk(audio_data):
-                raise HTTPException(status_code=500, detail="Failed to write audio data to file")
-                
-            transcription = await service.call_grop_api()
-            
-            # Clean up temp file
-            try:
-                os.remove(temp_filename)
-            except Exception as e:
-                logger.warning(f"Failed to remove temp file: {e}")
-            
-            if transcription:
-                logger.debug(f"Transcription successful: {transcription[:50]}...")
-                return {"text": transcription}
-            else:
-                return {"text": ""}
+            from app.services.auth import verify_token, get_user_by_username
+            username = verify_token(credentials.credentials)
+            if username:
+                user = get_user_by_username(db, username)
+                if user:
+                    user_id = user.id
         except Exception as e:
-            logger.error(f"Transcription failed: {e}")
-            raise HTTPException(status_code=404, detail=str(e))
+            logger.warning(f"Authentication failed: {e}")
+            # Continue without user_id for anonymous users
+    
+    try:
+        # Determine which form field was used by the client
+        incoming_file = audio or audio_file
+        if incoming_file is None:
+            logger.debug("No audio file provided in request")
+            raise HTTPException(status_code=422, detail="audio file is required")
+
+        # Log incoming request details (avoid accessing .size)
+        logger.debug(f"Received transcription request. File: {incoming_file.filename}, Content-Type: {incoming_file.content_type}, Language: {language}, Target: {target_language}, Model: {model_name}")
+
+        # Read the audio data
+        audio_data = await incoming_file.read()
+        logger.debug(f"Audio data read, size: {len(audio_data)} bytes")
+
+        # Initialize service and process audio (pass audio data directly to call_api)
+        service = SpeechToTextService(model_name, language, user_id, db)
+        # Use the new call_api method which checks custom endpoints first
+        transcription = await service.call_api(audio_data, incoming_file.filename)
+
+        # If no transcription, return empty
+        if not transcription:
+            return {"text": "", "translated_text": ""}
+
+        translation_service = TranslationService()
+        # Detect language of transcribed text if language was 'auto' or not provided
+        detected = translation_service.detect_language(transcription)
+        source_lang = detected.detected_language if detected and detected.detected_language else 'auto'
+
+        # Translate to target_language using translation service (default to google)
+        # Choose engine based on user preferences in future; for now use google
+        try:
+            translation_result = await translation_service.translate_text(
+                transcription,
+                source_lang,
+                target_language,
+                user_id,
+                db
+            )
+        except Exception as e:
+            logger.error(f"Translation failed: {e}")
+            # Fallback: return transcription only
+            return {"text": transcription, "translated_text": ""}
+
+        # Build response
+        response = {
+            "text": transcription,
+            "source_language": source_lang,
+            "translated_text": translation_result.translated_text,
+            "target_language": translation_result.target_language,
+            "translation_engine": translation_result.translation_engine
+        }
+
+        logger.debug(f"Transcription+translation completed: {response}")
+        return response
+
+    except Exception as e:
+        logger.error(f"Transcription failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 # @router.websocket("/realtimestt")
 # async def websocket_endpoint(websocket: WebSocket, language: str = "en"):
 #     logger.debug(f"WebSocket connection attempt with language: {language}")
