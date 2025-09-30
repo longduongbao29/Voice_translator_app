@@ -37,7 +37,7 @@ const FavoritesPage: React.FC = () => {
         if (!translationId) return;
 
         try {
-            const result = await favoritesApi.toggleFavorite(translationId, false);
+            const result = await favoritesApi.removeFromFavorites(translationId);
 
             if (result.success) {
                 // Remove from the list

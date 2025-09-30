@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.tsx';
 import { userApi } from '../services/api.ts';
-import { UserPreferences, CustomEndpoint, WebhookIntegration } from '../types';
+import { UserSettings, CustomEndpoint, WebhookIntegration } from '../types';
 import { Trash2, Edit2, Plus, Settings, Code, Share2 } from 'lucide-react';
 
 const SettingsPage: React.FC = () => {
     const { user } = useAuth();
-    const [preferences, setPreferences] = useState<UserPreferences>({
-        default_source_language: 'auto',
-        default_target_language: 'en',
-        preferred_engine: 'google',
-        preferred_speech2text: 'google',
+    const [settings, setSettings] = useState<UserSettings>({
+        src_lang: 'auto',
+        trg_lang: 'en',
+        translate_api: 'google',
+        stt_api: 'groq',
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -32,15 +32,16 @@ const SettingsPage: React.FC = () => {
     const [editingWebhook, setEditingWebhook] = useState<WebhookIntegration | null>(null);
     const [isAddingWebhook, setIsAddingWebhook] = useState(false);
 
-    const fetchPreferences = async () => {
+
+    const fetchSettings = async () => {
         try {
             setLoading(true);
-            const result = await userApi.getPreferences();
+            const result = await userApi.getSettings();
 
             if (result.success && result.data) {
-                setPreferences(result.data);
+                setSettings(result.data);
             } else {
-                setError(result.error || 'Failed to fetch preferences');
+                setError(result.error || 'Failed to fetch settings');
             }
         } catch (err: any) {
             setError(err.message || 'An unexpected error occurred');
@@ -85,25 +86,25 @@ const SettingsPage: React.FC = () => {
 
     useEffect(() => {
         if (user) {
-            fetchPreferences();
+            fetchSettings(); // Load user settings for general tab
             fetchCustomEndpoints();
             fetchWebhooks();
         }
     }, [user]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSettingsSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
         setSuccessMessage(null);
         setSaving(true);
 
         try {
-            const result = await userApi.updatePreferences(preferences);
+            const result = await userApi.updateSettings(settings);
 
             if (result.success) {
-                setSuccessMessage('Cài đặt đã được lưu thành công');
+                setSuccessMessage('Cài đặt chung đã được lưu thành công');
             } else {
-                setError(result.error || 'Failed to save preferences');
+                setError(result.error || 'Failed to save settings');
             }
         } catch (err: any) {
             setError(err.message || 'An unexpected error occurred');
@@ -112,21 +113,12 @@ const SettingsPage: React.FC = () => {
         }
     };
 
-    const handleChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
-        const { name, value, type } = e.target;
-
-        if (type === 'checkbox') {
-            const checked = (e.target as HTMLInputElement).checked;
-            setPreferences(prev => ({
-                ...prev,
-                [name]: checked
-            }));
-        } else {
-            setPreferences(prev => ({
-                ...prev,
-                [name]: value
-            }));
-        }
+    const handleSettingsChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setSettings(prev => ({
+            ...prev,
+            [name]: value
+        }));
     };
 
     if (!user) {
@@ -314,19 +306,19 @@ const SettingsPage: React.FC = () => {
                 <div>
                     {/* General Settings Tab */}
                     {activeTab === 'general' && (
-                        <form onSubmit={handleSubmit}>
+                        <form onSubmit={handleSettingsSubmit}>
                             <div className="mb-6">
                                 <h2 className="text-lg font-semibold mb-4 pb-2 border-b">Cài đặt dịch thuật</h2>
 
                                 <div className="mb-4">
-                                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="default_source_language">
+                                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="src_lang">
                                         Ngôn ngữ nguồn mặc định
                                     </label>
                                     <select
-                                        id="default_source_language"
-                                        name="default_source_language"
-                                        value={preferences.default_source_language}
-                                        onChange={handleChange}
+                                        id="src_lang"
+                                        name="src_lang"
+                                        value={settings.src_lang}
+                                        onChange={handleSettingsChange}
                                         className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                                     >
                                         <option value="auto">Tự động phát hiện</option>
@@ -343,14 +335,14 @@ const SettingsPage: React.FC = () => {
                                 </div>
 
                                 <div className="mb-4">
-                                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="default_target_language">
+                                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="trg_lang">
                                         Ngôn ngữ đích mặc định
                                     </label>
                                     <select
-                                        id="default_target_language"
-                                        name="default_target_language"
-                                        value={preferences.default_target_language}
-                                        onChange={handleChange}
+                                        id="trg_lang"
+                                        name="trg_lang"
+                                        value={settings.trg_lang}
+                                        onChange={handleSettingsChange}
                                         className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                                     >
                                         <option value="en">Tiếng Anh</option>
@@ -366,20 +358,20 @@ const SettingsPage: React.FC = () => {
                                 </div>
 
                                 <div className="mb-4">
-                                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="preferred_engine">
+                                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="translate_api">
                                         Công cụ dịch ưu tiên
                                     </label>
                                     <select
-                                        id="preferred_engine"
-                                        name="preferred_engine"
-                                        value={preferences.preferred_engine}
-                                        onChange={handleChange}
+                                        id="translate_api"
+                                        name="translate_api"
+                                        value={settings.translate_api}
+                                        onChange={handleSettingsChange}
                                         className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                                     >
-                                        <option value="google">Google Translate</option>
-                                        <option value="openai">OpenAI</option>
+                                        <option value="google">Google Translate API</option>
+
                                         {customEndpoints
-                                            .filter(ep => ep.endpoint_type === 'translation' && ep.is_active)
+                                            .filter(ep => ep.endpoint_type === 'translation')
                                             .map(ep => (
                                                 <option key={ep.id} value={`custom_${ep.id}`}>{ep.name}</option>
                                             ))
@@ -388,20 +380,20 @@ const SettingsPage: React.FC = () => {
                                 </div>
 
                                 <div className="mb-4">
-                                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="preferred_speech2text">
+                                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="stt_api">
                                         Công cụ chuyển đổi giọng nói thành văn bản ưu tiên
                                     </label>
                                     <select
-                                        id="preferred_speech2text"
-                                        name="preferred_speech2text"
-                                        value={preferences.preferred_speech2text}
-                                        onChange={handleChange}
+                                        id="stt_api"
+                                        name="stt_api"
+                                        value={settings.stt_api}
+                                        onChange={handleSettingsChange}
                                         className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                                     >
-                                        <option value="google">Google Speech-to-Text</option>
-                                        <option value="openai">OpenAI Whisper</option>
+
+                                        <option value="groq">Groq Whisper</option>
                                         {customEndpoints
-                                            .filter(ep => ep.endpoint_type === 'speech2text' && ep.is_active)
+                                            .filter(ep => ep.endpoint_type === 'speech2text')
                                             .map(ep => (
                                                 <option key={ep.id} value={`custom_${ep.id}`}>{ep.name}</option>
                                             ))

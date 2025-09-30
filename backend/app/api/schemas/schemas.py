@@ -34,6 +34,31 @@ class UserPreferences(BaseModel):
     custom_endpoints_enabled: Optional[bool] = False
     webhooks_enabled: Optional[bool] = False
 
+# UserSettings schemas
+class UserSettingsBase(BaseModel):
+    src_lang: Optional[str] = "auto"
+    trg_lang: Optional[str] = "en"
+    translate_api: Optional[str] = "google"
+    stt_api: Optional[str] = "groq"
+
+class UserSettingsCreate(UserSettingsBase):
+    user_id: int
+
+class UserSettingsUpdate(BaseModel):
+    src_lang: Optional[str] = None
+    trg_lang: Optional[str] = None
+    translate_api: Optional[str] = None
+    stt_api: Optional[str] = None
+
+class UserSettingsResponse(UserSettingsBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
 # Translation schemas
 class TranslationRequest(BaseModel):
     text: str
@@ -88,7 +113,7 @@ class CustomEndpointBase(BaseModel):
     endpoint_url: str
     api_key: Optional[str] = None
     headers: Optional[dict] = None
-    is_active: Optional[bool] = True
+    is_active: Optional[bool] = False  # Default inactive until selected
 
 class CustomEndpointCreate(CustomEndpointBase):
     pass

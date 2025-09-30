@@ -13,7 +13,6 @@ class User(Base):
     full_name = Column(String, nullable=True)
     avatar = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
-    preferences = Column(JSON, nullable=True)  # User preferences stored as JSON
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -51,7 +50,7 @@ class CustomEndpoint(Base):
     endpoint_url = Column(String(255), nullable=False)
     api_key = Column(String(255), nullable=True)
     headers = Column(JSON, nullable=True)  # Additional headers as JSON
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=False)  # Default inactive, activated when selected
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -67,5 +66,17 @@ class WebhookIntegration(Base):
     event_types = Column(JSON, nullable=True)  # Events to trigger webhook, stored as JSON array
     config = Column(JSON, nullable=True)  # Platform-specific configuration
     is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+class UserSettings(Base):
+    __tablename__ = "user_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, unique=True)  # One settings record per user
+    src_lang = Column(String(10), nullable=True, default="auto")  # Source language (auto-detect by default)
+    trg_lang = Column(String(10), nullable=True, default="en")  # Target language
+    translate_api = Column(String(50), nullable=True, default="google")  # Translation API preference
+    stt_api = Column(String(50), nullable=True, default="groq")  # Speech-to-text API preference
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

@@ -9,7 +9,7 @@ export interface TranslationRequest {
   text: string;
   source_language: string;
   target_language: string;
-  engine?: 'google' | 'openai' | 'local';
+  engine?: string; // Support custom engines like 'custom_123'
 }
 
 export interface TranslationResponse {
@@ -98,6 +98,17 @@ export interface UserPreferences {
   preferred_speech2text?: string;
   custom_endpoints_enabled?: boolean;
   webhooks_enabled?: boolean;
+}
+
+export interface UserSettings {
+  id?: number;
+  user_id?: number;
+  src_lang?: string;
+  trg_lang?: string;
+  translate_api?: string;
+  stt_api?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface CustomEndpoint {

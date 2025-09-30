@@ -20,7 +20,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
   const [translatedText, setTranslatedText] = useState('');
   const [sourceLanguage, setSourceLanguage] = useState('auto');
   const [targetLanguage, setTargetLanguage] = useState('en');
-  const [translationEngine, setTranslationEngine] = useState<'google' | 'openai'>('google');
+  const [translationEngine, setTranslationEngine] = useState<string>('google');
   const [isTranslating, setIsTranslating] = useState(false);
   const [lastTranslation, setLastTranslation] = useState<TranslationResponse | null>(null);
   const [sttError, setSttError] = useState<string | undefined>(undefined);
@@ -34,31 +34,31 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
   const audioRecorder = useAudioRecorder();
   const { isAuthenticated, user } = useAuth();
 
-  // Load user preferences after login
+  // Load user settings after login
   useEffect(() => {
-    const loadUserPreferences = async () => {
+    const loadUserSettings = async () => {
       if (isAuthenticated && user) {
         try {
-          const result = await userApi.getPreferences();
+          const result = await userApi.getSettings();
           if (result.success && result.data) {
-            // Apply user preferences
-            if (result.data.default_source_language) {
-              setSourceLanguage(result.data.default_source_language);
+            // Apply user settings
+            if (result.data.src_lang) {
+              setSourceLanguage(result.data.src_lang);
             }
-            if (result.data.default_target_language) {
-              setTargetLanguage(result.data.default_target_language);
+            if (result.data.trg_lang) {
+              setTargetLanguage(result.data.trg_lang);
             }
-            if (result.data.preferred_engine) {
-              setTranslationEngine(result.data.preferred_engine as 'google' | 'openai');
+            if (result.data.translate_api) {
+              setTranslationEngine(result.data.translate_api);
             }
           }
         } catch (error) {
-          console.error('Failed to load user preferences:', error);
+          console.error('Failed to load user settings:', error);
         }
       }
     };
 
-    loadUserPreferences();
+    loadUserSettings();
   }, [isAuthenticated, user]);
 
   // Handle recorder errors
@@ -362,7 +362,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
             <h3 className="font-medium text-gray-900">Source Text</h3>
             <div className="flex items-center space-x-2">
               {/* Voice Input Button */}
-              <button
+              {/* <button
                 onClick={toggleVoiceRecognition}
                 className={`p-2.5 rounded-full transition-all duration-200 shadow-sm ${audioRecorder.isRecording
                   ? 'bg-red-500 text-white hover:bg-red-600'
@@ -386,7 +386,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
                 ) : (
                   <Mic className="w-5 h-5" />
                 )}
-              </button>
+              </button> */}
               {typeof window !== 'undefined' && window.speechSynthesis && (
                 <button
                   onClick={() => handleSpeakText(sourceText, sourceLanguage === 'auto' && detectedLanguage ? detectedLanguage : sourceLanguage)}

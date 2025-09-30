@@ -9,6 +9,7 @@ import {
   RegisterRequest,
   AuthResponse,
   UserResponse,
+  UserSettings,
   CustomEndpoint,
   WebhookIntegration
 } from '../types';
@@ -124,6 +125,22 @@ export const translationApi = {
     } catch (error: any) {
       return {
         error: error.response?.data?.detail || error.message || 'Failed to delete history item',
+        success: false,
+      };
+    }
+  },
+
+  // Clear all translation history
+  clearHistory: async (): Promise<ApiResponse<any>> => {
+    try {
+      const response = await api.delete('/translate/history');
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to clear history',
         success: false,
       };
     }
@@ -356,6 +373,38 @@ export const userApi = {
     }
   },
 
+  // Get user settings
+  getSettings: async (): Promise<ApiResponse<UserSettings>> => {
+    try {
+      const response = await api.get('/users/settings');
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to fetch settings',
+        success: false,
+      };
+    }
+  },
+
+  // Update user settings
+  updateSettings: async (settings: Partial<UserSettings>): Promise<ApiResponse<UserSettings>> => {
+    try {
+      const response = await api.put('/users/settings', settings);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to update settings',
+        success: false,
+      };
+    }
+  },
+
   // Developer API - Custom Endpoints
   getCustomEndpoints: async (): Promise<ApiResponse<CustomEndpoint[]>> => {
     try {
@@ -528,7 +577,7 @@ export const favoritesApi = {
   // Add translation to favorites
   addToFavorites: async (translationId: number): Promise<ApiResponse<any>> => {
     try {
-      const response = await api.post(`/translate/favorite/${translationId}`);
+      const response = await api.put(`/translate/favorite/${translationId}`, { is_favorite: true });
       return {
         data: response.data,
         success: true,
@@ -544,7 +593,7 @@ export const favoritesApi = {
   // Remove translation from favorites
   removeFromFavorites: async (translationId: number): Promise<ApiResponse<any>> => {
     try {
-      const response = await api.delete(`/translate/favorite/${translationId}`);
+      const response = await api.put(`/translate/favorite/${translationId}`, { is_favorite: false });
       return {
         data: response.data,
         success: true,
@@ -552,6 +601,22 @@ export const favoritesApi = {
     } catch (error: any) {
       return {
         error: error.response?.data?.detail || error.message || 'Failed to remove from favorites',
+        success: false,
+      };
+    }
+  },
+
+  // Add toggleFavorite method for consistency
+  toggleFavorite: async (translationId: number, isFavorite: boolean): Promise<ApiResponse<any>> => {
+    try {
+      const response = await api.put(`/translate/favorite/${translationId}`, { is_favorite: isFavorite });
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to update favorite status',
         success: false,
       };
     }

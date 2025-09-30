@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.database.postgres import get_db
-from app.api.schemas.schemas import UserResponse, UserUpdate, UserPreferences
-from app.services.auth import verify_token, get_user_by_username
+from app.api.schemas.schemas import UserResponse, UserUpdate, UserPreferences, UserSettingsResponse, UserSettingsUpdate
+from app.database.models import UserSettings
+from app.services.auth import verify_token, get_user_by_username, get_user_settings, update_user_settings
 import os
 import shutil
 import uuid
@@ -246,6 +247,109 @@ async def update_user_preferences(
         db.refresh(user)
         
         return preferences
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.get("/settings", response_model=UserSettingsResponse)
+async def get_user_settings_endpoint(
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Get user settings"""
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    try:
+        username = verify_token(credentials.credentials)
+        if not username:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        user = get_user_by_username(db, username)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        settings = get_user_settings(db, user.id)
+        if not settings:
+            # Create default settings if none exist
+            default_settings = UserSettings(
+                user_id=user.id,
+                src_lang="auto",
+                trg_lang="en", 
+                translate_api="google",
+                stt_api="groq"
+            )
+            db.add(default_settings)
+            db.commit()
+            db.refresh(default_settings)
+            return default_settings
+        
+        return settings
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.put("/settings", response_model=UserSettingsResponse)
+async def update_user_settings_endpoint(
+    settings_update: UserSettingsUpdate,
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Update user settings"""
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    try:
+        username = verify_token(credentials.credentials)
+        if not username:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        user = get_user_by_username(db, username)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Convert Pydantic model to dict for update
+        try:
+            # For Pydantic v2
+            settings_dict = settings_update.model_dump(exclude_none=True)
+        except AttributeError:
+            # For Pydantic v1
+            settings_dict = settings_update.dict(exclude_none=True)
+        
+        updated_settings = update_user_settings(db, user.id, settings_dict)
+        if not updated_settings:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User settings not found"
+            )
+        
+        return updated_settings
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
