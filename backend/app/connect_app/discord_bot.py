@@ -15,6 +15,8 @@ class DiscordService:
         self.token = os.getenv("DISCORD_BOT_TOKEN")
         self.is_running = False
         self.translation_service = TranslationService()
+        # Track channels that have been notified about setup to prevent spam
+        self.setup_notified_channels = set()
     
     async def initialize_bot(self):
         """Initialize Discord bot client"""
@@ -60,6 +62,17 @@ class DiscordService:
                     logger.info(f"Message sent to Discord channel {channel_id}")
             except Exception as e:
                 logger.error(f"Error sending message to Discord: {str(e)}")
+
+    def reset_setup_notifications(self):
+        """Reset the list of channels that have been notified about setup"""
+        self.setup_notified_channels.clear()
+        logger.info("Setup notification tracking has been reset")
+        
+    def remove_setup_notification(self, channel_id: str):
+        """Remove a specific channel from setup notification tracking"""
+        if channel_id in self.setup_notified_channels:
+            self.setup_notified_channels.remove(channel_id)
+            logger.info(f"Removed setup notification tracking for channel {channel_id}")
 
     def parse_translate_command(self, content: str) -> tuple:
         """
@@ -167,6 +180,26 @@ Messages are automatically translated based on your user settings if webhook int
                             user_id = integration.user_id
                             break
                 
+                # Check if user setup is found
+                if not user_id:
+                    setup_message = """
+🔧 **Setup Required**
+
+This Discord channel is not yet configured for translation services.
+
+**To get started:**
+1. Visit the Voice Translator app
+2. Go to **Profile** → **Integrations** → **Discord**
+3. Connect this Discord channel to your account
+4. Configure your translation preferences
+
+Once setup is complete, you'll be able to use translation commands and automatic translation features.
+
+**Need help?** Contact your administrator for assistance with the setup process.
+                    """
+                    await self.send_message(channel_id, setup_message.strip())
+                    return
+                
                 # Validate language codes
                 supported_languages = self.translation_service.get_supported_languages()
                 
@@ -233,6 +266,25 @@ Messages are automatically translated based on your user settings if webhook int
                 
                 if not user_id:
                     logger.info(f"No webhook integration found for channel_id: {channel_id}")
+                    # Send setup notification for auto-translate (only once per channel to avoid spam)
+                    if channel_id not in self.setup_notified_channels:
+                        self.setup_notified_channels.add(channel_id)
+                        setup_message = """
+🔧 **Auto-Translation Setup Required**
+
+This Discord channel is not configured for automatic translation.
+
+**To enable auto-translation:**
+1. Visit the Voice Translator app
+2. Go to **Profile** → **Integrations** → **Discord**  
+3. Connect this Discord channel to your account
+4. Set your preferred source and target languages
+
+**Manual Translation:** You can still use `!translate <src_lang> <target_lang> <text>` commands, but auto-translation requires setup.
+
+Type `!help` for manual translation instructions.
+                        """
+                        await self.send_message(channel_id, setup_message.strip())
                     return
                 
                 # Get user settings for translation preferences
