@@ -1,13 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.api import api_router
+from app.api.api import api_router
 from app.database.postgres import engine
 from app.database.models import Base
 from app.utils.logger import logger, log_startup, log_shutdown
 from app.utils.middleware import LoggingMiddleware, ErrorLoggingMiddleware
+from app.connect_app.discord_bot import discord_service
 import os
 import atexit
-
+import asyncio
 # Setup logging
 log_startup()
 
@@ -23,6 +24,13 @@ app = FastAPI(
     openapi_url="/api/v1/openapi.json"
 )
 
+
+@app.on_event("startup")
+async def startup_event():
+    """Startup tasks"""
+    # Start Discord bot in background
+    asyncio.create_task(discord_service.start_bot())
+    logger.info("Discord bot started in background")
 
 
 # Register shutdown handler
@@ -43,7 +51,7 @@ app.add_middleware(
 logger.info("Middleware configured")
 
 # Include API routes
-app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router, prefix="/api")
 logger.info("API routes configured")
 
 @app.get("/")
@@ -92,6 +100,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8003,
+        port=9003,
         reload=True
     )

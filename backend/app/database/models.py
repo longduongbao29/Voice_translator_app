@@ -61,11 +61,7 @@ class WebhookIntegration(Base):
     user_id = Column(Integer, nullable=False)
     name = Column(String(100), nullable=False)
     platform = Column(String(50), nullable=False)  # 'slack', 'discord', 'zalo', 'custom'
-    webhook_url = Column(String(255), nullable=False)
-    secret_key = Column(String(255), nullable=True)  # For webhook verification
-    event_types = Column(JSON, nullable=True)  # Events to trigger webhook, stored as JSON array
-    config = Column(JSON, nullable=True)  # Platform-specific configuration
-    is_active = Column(Boolean, default=True)
+    meta_data = Column(JSON, nullable=True)  # Stores webhook_url, secret_key, event_types, config and other platform-specific data
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

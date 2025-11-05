@@ -31,6 +31,7 @@ const SettingsPage: React.FC = () => {
     const [loadingWebhooks, setLoadingWebhooks] = useState(false);
     const [editingWebhook, setEditingWebhook] = useState<WebhookIntegration | null>(null);
     const [isAddingWebhook, setIsAddingWebhook] = useState(false);
+    const [selectedPlatform, setSelectedPlatform] = useState<'slack' | 'discord' | 'zalo' | 'custom'>('discord');
 
 
     const fetchSettings = async () => {
@@ -628,11 +629,19 @@ const SettingsPage: React.FC = () => {
                                                         <div>
                                                             <h4 className="font-medium">{webhook.name}</h4>
                                                             <p className="text-sm text-gray-600">Platform: {webhook.platform}</p>
-                                                            <p className="text-xs text-gray-500 mt-1">{webhook.webhook_url}</p>
+                                                            {webhook.meta_data?.webhook_url && (
+                                                                <p className="text-xs text-gray-500 mt-1">{webhook.meta_data.webhook_url}</p>
+                                                            )}
+                                                            {webhook.meta_data?.channel_id && (
+                                                                <p className="text-xs text-gray-500 mt-1">Channel ID: {webhook.meta_data.channel_id}</p>
+                                                            )}
                                                         </div>
                                                         <div className="flex space-x-2">
                                                             <button
-                                                                onClick={() => setEditingWebhook(webhook)}
+                                                                onClick={() => {
+                                                                    setEditingWebhook(webhook);
+                                                                    setSelectedPlatform(webhook.platform);
+                                                                }}
                                                                 className="text-blue-600 hover:text-blue-800"
                                                             >
                                                                 <Edit2 className="w-4 h-4" />
@@ -660,43 +669,82 @@ const SettingsPage: React.FC = () => {
                                                 <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
                                                     e.preventDefault();
                                                     const formEl = e.currentTarget;
-                                                    const nameEl = formEl.elements.namedItem('name') as HTMLInputElement;
                                                     const platformEl = formEl.elements.namedItem('platform') as HTMLSelectElement;
-                                                    const webhookUrlEl = formEl.elements.namedItem('webhook_url') as HTMLInputElement;
-                                                    const secretKeyEl = formEl.elements.namedItem('secret_key') as HTMLInputElement;
+
+                                                    if (!platformEl) {
+                                                        console.error('Platform select field not found');
+                                                        return;
+                                                    }
+
+                                                    const currentPlatform = platformEl.value as 'slack' | 'discord' | 'zalo' | 'custom';
+                                                    console.log('Current platform:', currentPlatform);
+
+                                                    let metaData: Record<string, any> = {
+
+                                                    };
+
+                                                    let webhookName = `${currentPlatform.charAt(0).toUpperCase() + currentPlatform.slice(1)} Integration`;
+
+                                                    if (currentPlatform === 'discord') {
+                                                        const channelIdEl = formEl.elements.namedItem('channel_id') as HTMLInputElement;
+                                                        if (channelIdEl) {
+                                                            metaData.channel_id = channelIdEl.value;
+                                                            console.log('Discord channel ID:', channelIdEl.value);
+                                                        } else {
+                                                            console.error('Channel ID field not found for Discord platform');
+                                                            return;
+                                                        }
+                                                    } else {
+                                                        const nameEl = formEl.elements.namedItem('name') as HTMLInputElement;
+                                                        const webhookUrlEl = formEl.elements.namedItem('webhook_url') as HTMLInputElement;
+                                                        const secretKeyEl = formEl.elements.namedItem('secret_key') as HTMLInputElement;
+
+                                                        if (nameEl && nameEl.value) {
+                                                            webhookName = nameEl.value;
+                                                        }
+                                                        if (webhookUrlEl) {
+                                                            metaData.webhook_url = webhookUrlEl.value;
+                                                            console.log('Webhook URL:', webhookUrlEl.value);
+                                                        } else {
+                                                            console.error('Webhook URL field not found for non-Discord platform');
+                                                            return;
+                                                        }
+                                                        if (secretKeyEl && secretKeyEl.value) {
+                                                            metaData.secret_key = secretKeyEl.value;
+                                                        }
+                                                    }
+
+                                                    const webhookData: WebhookIntegration = {
+                                                        name: webhookName,
+                                                        platform: currentPlatform,
+                                                        meta_data: metaData
+                                                    };
+
+                                                    console.log('Submitting webhook data:', webhookData);
 
                                                     if (editingWebhook) {
                                                         const updatedWebhook: WebhookIntegration = {
                                                             ...editingWebhook,
-                                                            name: nameEl.value,
-                                                            platform: platformEl.value as 'slack' | 'discord' | 'zalo' | 'custom',
-                                                            webhook_url: webhookUrlEl.value,
-                                                            secret_key: secretKeyEl.value || editingWebhook.secret_key
+                                                            ...webhookData
                                                         };
                                                         handleUpdateWebhook(updatedWebhook);
                                                     } else {
-                                                        const newWebhook: WebhookIntegration = {
-                                                            name: nameEl.value,
-                                                            platform: platformEl.value as 'slack' | 'discord' | 'zalo' | 'custom',
-                                                            webhook_url: webhookUrlEl.value,
-                                                            secret_key: secretKeyEl.value || undefined,
-                                                            event_types: ['translation_completed'],
-                                                            is_active: true
-                                                        };
-                                                        handleAddWebhook(newWebhook);
+                                                        handleAddWebhook(webhookData);
                                                     }
                                                 }}>
-                                                    <div className="mb-4">
-                                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                            Name
-                                                        </label>
-                                                        <input
-                                                            name="name"
-                                                            defaultValue={editingWebhook?.name || ''}
-                                                            className="w-full p-2 border rounded"
-                                                            required
-                                                        />
-                                                    </div>
+                                                    {(editingWebhook?.platform || selectedPlatform) !== 'discord' && (
+                                                        <div className="mb-4">
+                                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                                Name
+                                                            </label>
+                                                            <input
+                                                                name="name"
+                                                                defaultValue={editingWebhook?.name || ''}
+                                                                className="w-full p-2 border rounded"
+                                                                required
+                                                            />
+                                                        </div>
+                                                    )}
 
                                                     <div className="mb-4">
                                                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -704,39 +752,60 @@ const SettingsPage: React.FC = () => {
                                                         </label>
                                                         <select
                                                             name="platform"
-                                                            defaultValue={editingWebhook?.platform || 'slack'}
+                                                            value={editingWebhook?.platform || selectedPlatform}
+                                                            onChange={(e) => {
+                                                                const platform = e.target.value as 'slack' | 'discord' | 'zalo' | 'custom';
+                                                                setSelectedPlatform(platform);
+                                                            }}
                                                             className="w-full p-2 border rounded"
                                                         >
-                                                            <option value="slack">Slack</option>
                                                             <option value="discord">Discord</option>
+                                                            <option value="slack">Slack</option>
                                                             <option value="zalo">Zalo</option>
                                                             <option value="custom">Custom</option>
                                                         </select>
                                                     </div>
 
-                                                    <div className="mb-4">
-                                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                            Webhook URL
-                                                        </label>
-                                                        <input
-                                                            name="webhook_url"
-                                                            defaultValue={editingWebhook?.webhook_url || ''}
-                                                            className="w-full p-2 border rounded"
-                                                            required
-                                                        />
-                                                    </div>
+                                                    {(editingWebhook?.platform || selectedPlatform) === 'discord' ? (
+                                                        <div className="mb-4">
+                                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                                Channel ID
+                                                            </label>
+                                                            <input
+                                                                name="channel_id"
+                                                                defaultValue={editingWebhook?.meta_data?.channel_id || ''}
+                                                                className="w-full p-2 border rounded"
+                                                                placeholder="Enter Discord Channel ID"
+                                                                required
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div className="mb-4">
+                                                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                                    Webhook URL
+                                                                </label>
+                                                                <input
+                                                                    name="webhook_url"
+                                                                    defaultValue={editingWebhook?.meta_data?.webhook_url || ''}
+                                                                    className="w-full p-2 border rounded"
+                                                                    required
+                                                                />
+                                                            </div>
 
-                                                    <div className="mb-4">
-                                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                            Secret Key (optional)
-                                                        </label>
-                                                        <input
-                                                            name="secret_key"
-                                                            type="password"
-                                                            defaultValue={editingWebhook?.secret_key || ''}
-                                                            className="w-full p-2 border rounded"
-                                                        />
-                                                    </div>
+                                                            <div className="mb-4">
+                                                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                                    Secret Key (optional)
+                                                                </label>
+                                                                <input
+                                                                    name="secret_key"
+                                                                    type="password"
+                                                                    defaultValue={editingWebhook?.meta_data?.secret_key || ''}
+                                                                    className="w-full p-2 border rounded"
+                                                                />
+                                                            </div>
+                                                        </>
+                                                    )}
 
                                                     <div className="flex justify-end space-x-2 mt-6">
                                                         <button
@@ -744,6 +813,7 @@ const SettingsPage: React.FC = () => {
                                                             onClick={() => {
                                                                 setIsAddingWebhook(false);
                                                                 setEditingWebhook(null);
+                                                                setSelectedPlatform('discord'); // Reset to default
                                                             }}
                                                             className="px-4 py-2 border rounded text-gray-600 hover:bg-gray-100"
                                                         >

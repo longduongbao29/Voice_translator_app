@@ -138,22 +138,15 @@ class CustomEndpointResponse(CustomEndpointBase):
 class WebhookIntegrationBase(BaseModel):
     name: str
     platform: str  # 'slack', 'discord', 'zalo', 'custom'
-    webhook_url: str
-    secret_key: Optional[str] = None
-    event_types: Optional[List[str]] = None
-    config: Optional[dict] = None
-    is_active: Optional[bool] = True
+    meta_data: Optional[dict] = None  # Stores webhook_url, secret_key, event_types, config and other platform-specific data
 
 class WebhookIntegrationCreate(WebhookIntegrationBase):
     pass
 
 class WebhookIntegrationUpdate(BaseModel):
     name: Optional[str] = None
-    webhook_url: Optional[str] = None
-    secret_key: Optional[str] = None
-    event_types: Optional[List[str]] = None
-    config: Optional[dict] = None
-    is_active: Optional[bool] = None
+    platform: Optional[str] = None
+    meta_data: Optional[dict] = None
 
 class WebhookIntegrationResponse(WebhookIntegrationBase):
     id: int

@@ -296,11 +296,7 @@ async def create_webhook(
             user_id=user.id,
             name=webhook.name,
             platform=webhook.platform,
-            webhook_url=webhook.webhook_url,
-            secret_key=webhook.secret_key,
-            event_types=webhook.event_types,
-            config=webhook.config,
-            is_active=webhook.is_active
+            meta_data=webhook.meta_data
         )
         db.add(db_webhook)
         db.commit()

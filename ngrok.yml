@@ -1,0 +1,9 @@
+version: "2"
+tunnels:
+  voice-translator:
+    proto: http
+    addr: backend:8000
+    hostname: knowing-nationally-mako.ngrok-free.app
+    schemes:
+      - https
+    inspect: true

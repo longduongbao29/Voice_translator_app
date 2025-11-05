@@ -127,11 +127,7 @@ export interface WebhookIntegration {
   id?: number;
   name: string;
   platform: 'slack' | 'discord' | 'zalo' | 'custom';
-  webhook_url: string;
-  secret_key?: string;
-  event_types?: string[];
-  config?: Record<string, any>;
-  is_active?: boolean;
+  meta_data?: Record<string, any>; // Stores webhook_url, secret_key, event_types, config and other platform-specific data
   created_at?: string;
   updated_at?: string;
 }
