@@ -216,6 +216,78 @@ export const speechToTextApi = {
   },
 };
 
+export const text2speechApi = {
+  // Synthesize text to speech
+  synthesizeText: async (
+    text: string,
+    languageCode?: string,
+    voiceId?: string,
+    outputFormat: string = 'mp3_44100_128',
+    modelName: string = 'eleven_v3'
+  ): Promise<ApiResponse<Blob>> => {
+    try {
+      const formData = new FormData();
+      formData.append('text', text);
+      if (languageCode) formData.append('language_code', languageCode);
+      if (voiceId) formData.append('voice_id', voiceId);
+      formData.append('output_format', outputFormat);
+      formData.append('model_name', modelName);
+
+      const url = `${API_BASE_URL}/text2speech/synthesize`;
+      const token = localStorage.getItem('authToken');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await axios.post(url, formData, {
+        headers,
+        responseType: 'blob' // Important: Tell axios to expect binary data
+      });
+
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Text-to-speech failed',
+        success: false,
+      };
+    }
+  },
+
+  // Get available voices
+  getVoices: async (): Promise<ApiResponse<{ voices: any, default_voice: string }>> => {
+    try {
+      const response = await api.get('/text2speech/voices');
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to get voices',
+        success: false,
+      };
+    }
+  },
+
+  // Get supported audio formats
+  getFormats: async (): Promise<ApiResponse<{ formats: string[], default_format: string }>> => {
+    try {
+      const response = await api.get('/text2speech/formats');
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to get formats',
+        success: false,
+      };
+    }
+  },
+};
+
 export const authApi = {
   // Login user
   login: async (loginData: LoginRequest): Promise<ApiResponse<AuthResponse>> => {
@@ -621,6 +693,101 @@ export const favoritesApi = {
       };
     }
   }
+};
+
+export const elevenLabsApi = {
+  // Get ElevenLabs settings
+  getSettings: async (): Promise<ApiResponse<any>> => {
+    try {
+      const response = await api.get('/elevenlabs/settings');
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to get ElevenLabs settings',
+        success: false,
+      };
+    }
+  },
+
+  // Update ElevenLabs settings
+  updateSettings: async (settings: any): Promise<ApiResponse<any>> => {
+    try {
+      const response = await api.put('/elevenlabs/settings', settings);
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to update ElevenLabs settings',
+        success: false,
+      };
+    }
+  },
+
+  // Get available voices
+  getVoices: async (): Promise<ApiResponse<any>> => {
+    try {
+      const response = await api.get('/elevenlabs/voices');
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to get voices',
+        success: false,
+      };
+    }
+  },
+
+  // Get available models
+  getModels: async (): Promise<ApiResponse<any>> => {
+    try {
+      const response = await api.get('/elevenlabs/models');
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to get models',
+        success: false,
+      };
+    }
+  },
+
+  // Clone voice
+  cloneVoice: async (name: string, description: string, files: File[]): Promise<ApiResponse<any>> => {
+    try {
+      const formData = new FormData();
+      formData.append('name', name);
+      if (description) formData.append('description', description);
+
+      files.forEach(file => {
+        formData.append('files', file);
+      });
+
+      const response = await api.post('/elevenlabs/clone-voice', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      return {
+        data: response.data,
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        error: error.response?.data?.detail || error.message || 'Failed to clone voice',
+        success: false,
+      };
+    }
+  },
 };
 
 export default api;

@@ -46,10 +46,10 @@ class CustomEndpoint(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, nullable=False)
     name = Column(String(100), nullable=False)
-    endpoint_type = Column(String(50), nullable=False)  # 'speech2text', 'translation'
-    endpoint_url = Column(String(255), nullable=False)
+    endpoint_type = Column(String(50), nullable=False)  # 'speech2text', 'translation', 'text2speech'
+    api_url = Column(String(255), nullable=False)  # Changed from endpoint_url for consistency
     api_key = Column(String(255), nullable=True)
-    headers = Column(JSON, nullable=True)  # Additional headers as JSON
+    meta_data = Column(JSON, nullable=True)  # Additional config as JSON (headers, body_params, etc.)
     is_active = Column(Boolean, default=False)  # Default inactive, activated when selected
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -74,5 +74,19 @@ class UserSettings(Base):
     trg_lang = Column(String(10), nullable=True, default="en")  # Target language
     translate_api = Column(String(50), nullable=True, default="google")  # Translation API preference
     stt_api = Column(String(50), nullable=True, default="groq")  # Speech-to-text API preference
+    text2speech_api = Column(String(50), nullable=True, default="elevenlabs")  # Text-to-speech API preference
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+class ElevenLabsSettings(Base):
+    __tablename__ = "elevenlabs_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, unique=True)  # One ElevenLabs settings record per user
+    model_id = Column(String(100), nullable=True, default="eleven_multilingual_v2")  # ElevenLabs model
+    voice_id = Column(String(100), nullable=True, default="JBFqnCBsd6RMkjVDRZzb")  # Selected voice ID
+    voice_name = Column(String(200), nullable=True, default="George")  # Voice display name
+    voice_settings = Column(JSON, nullable=True)  # Voice settings (stability, similarity_boost, etc.)
+    cloned_voices = Column(JSON, nullable=True)  # Array of cloned voice objects
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

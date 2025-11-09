@@ -50,6 +50,58 @@ export interface SpeechSynthesisState {
   error?: string;
 }
 
+export interface Text2SpeechRequest {
+  text: string;
+  language_code?: string;
+  voice_id?: string;
+  output_format?: string;
+  model_name?: string;
+}
+
+export interface Voice {
+  id: string;
+  name: string;
+  gender?: 'male' | 'female';
+  language?: string;
+}
+
+export interface ElevenLabsSettings {
+  id?: number;
+  user_id?: number;
+  model_id?: string;
+  voice_id?: string;
+  voice_name?: string;
+  voice_settings?: {
+    stability?: number;
+    similarity_boost?: number;
+    style?: number;
+    use_speaker_boost?: boolean;
+  };
+  cloned_voices?: ClonedVoice[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ClonedVoice {
+  voice_id: string;
+  name: string;
+  description?: string;
+  created_at?: string;
+}
+
+export interface ElevenLabsVoice {
+  voice_id: string;
+  name: string;
+  category: string;
+  description?: string;
+}
+
+export interface ElevenLabsModel {
+  model_id: string;
+  name: string;
+  description: string;
+}
+
 export interface User {
   id: number;
   username: string;
@@ -107,6 +159,7 @@ export interface UserSettings {
   trg_lang?: string;
   translate_api?: string;
   stt_api?: string;
+  text2speech_api?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -114,10 +167,10 @@ export interface UserSettings {
 export interface CustomEndpoint {
   id?: number;
   name: string;
-  endpoint_type: 'speech2text' | 'translation';
-  endpoint_url: string;
+  endpoint_type: 'speech2text' | 'translation' | 'text2speech';
+  api_url: string;
   api_key?: string;
-  headers?: Record<string, string>;
+  meta_data?: Record<string, any>;
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;

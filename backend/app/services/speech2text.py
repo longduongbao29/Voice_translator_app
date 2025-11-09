@@ -48,9 +48,7 @@ class SpeechToTextService:
             for segment in transcription.segments:
                 avg_logprob = segment.get("avg_logprob", None)
                 no_speech_prob = segment.get("no_speech_prob", None)
-                if  avg_logprob is not None and \
-                    avg_logprob > -0.5 and \
-                    no_speech_prob is not None and \
+                if  no_speech_prob is not None and \
                     no_speech_prob < 0.15:
                     fulltext += segment.get("text", "").strip() + " "
                     
@@ -88,8 +86,8 @@ class SpeechToTextService:
             headers = {}
             
             # Add custom headers if provided
-            if endpoint.headers:
-                headers.update(endpoint.headers)
+            if endpoint.meta_data and endpoint.meta_data.get("headers"):
+                headers.update(endpoint.meta_data["headers"])
             
             # Add API key if provided
             if endpoint.api_key:
@@ -104,7 +102,7 @@ class SpeechToTextService:
                 }
                 
                 response = await client.post(
-                    endpoint.endpoint_url,
+                    endpoint.api_url,
                     files=files,
                     data=data,
                     headers=headers,

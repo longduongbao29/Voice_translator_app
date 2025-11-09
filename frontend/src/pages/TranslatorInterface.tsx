@@ -1,21 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
-import { Volume2, VolumeX, Copy, ArrowLeftRight, Loader2, X, Star } from 'lucide-react';
+import { Volume2, VolumeX, Copy, ArrowLeftRight, Loader2, X, Star, Download } from 'lucide-react';
 import { Language, TranslationRequest, TranslationResponse } from '../types/index';
-import { translationApi, userApi } from '../services/api.ts';
-import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis.ts';
+import { translationApi, userApi, text2speechApi } from '../services/api.ts';
 import { useAudioRecorder } from '../hooks/useAudioRecorder.ts';
 import { useAuth } from '../context/AuthContext.tsx';
 import LanguageSelector from '../components/ui/LanguageSelector.tsx';
 import TextArea from '../components/ui/TextArea.tsx';
 
-interface TranslatorInterfaceProps {
-  languages: Language[];
-}
+interface TranslatorInterfaceProps { }
 
-const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
-  languages
-}) => {
+const TranslatorInterface: React.FC<TranslatorInterfaceProps> = () => {
   const [sourceText, setSourceText] = useState('');
   const [translatedText, setTranslatedText] = useState('');
   const [sourceLanguage, setSourceLanguage] = useState('auto');
@@ -28,10 +23,105 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
   const [isDetectingLanguage, setIsDetectingLanguage] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [languages, setLanguages] = useState<Language[]>([]);
+  const [isLoadingLanguages, setIsLoadingLanguages] = useState(true);
 
-  const speechSynthesis = useSpeechSynthesis();
   const audioRecorder = useAudioRecorder();
   const { isAuthenticated, user } = useAuth();
+
+  // Fetch supported languages from backend
+  useEffect(() => {
+    const loadLanguages = async () => {
+      setIsLoadingLanguages(true);
+      try {
+        const response = await translationApi.getLanguages();
+        console.log('🌐 Languages API response:', response);
+
+        if (response.success && response.data) {
+          const data: any = response.data;
+          console.log('🌐 Raw language data:', data);
+
+          let allLanguages: Language[] = [];
+
+          // Handle different response formats
+          if (data.languages && typeof data.languages === 'object') {
+            // Convert object to array and capitalize names
+            allLanguages = Object.entries(data.languages).map(([code, name]) => ({
+              code,
+              name: typeof name === 'string' ?
+                name.charAt(0).toUpperCase() + name.slice(1) :
+                String(name),
+              native_name: typeof name === 'string' ?
+                name.charAt(0).toUpperCase() + name.slice(1) :
+                String(name),
+              supports_offline: false
+            }));
+          } else if (Array.isArray(data)) {
+            // If response.data is already an array
+            allLanguages = data;
+          } else if (Array.isArray(data.languages)) {
+            // If response.data.languages is an array
+            allLanguages = data.languages;
+          }
+
+          // Popular languages that should appear first
+          const popularCodes = [
+            'vi', 'en', 'zh', 'es', 'fr', 'de', 'ja', 'ko', 'ru', 'ar',
+            'hi', 'pt', 'it', 'th', 'nl', 'tr', 'pl', 'sv', 'da', 'no'
+          ];
+
+          // Separate popular and other languages
+          const popularLanguages = popularCodes
+            .map(code => allLanguages.find(lang => lang.code === code))
+            .filter(Boolean) as Language[];
+
+          const otherLanguages = allLanguages
+            .filter(lang => !popularCodes.includes(lang.code))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+          // Combine with popular languages first
+          const finalLanguages = [...popularLanguages, ...otherLanguages];
+
+          console.log('🌐 Final languages:', finalLanguages.slice(0, 5));
+          setLanguages(finalLanguages);
+        } else {
+          console.error('Failed to fetch languages:', response.error);
+          // Fallback to default languages if API fails
+          setLanguages(getDefaultLanguages());
+          toast.error('Using default languages - backend not available');
+        }
+      } catch (error) {
+        console.error('Error fetching languages:', error);
+        // Fallback to default languages if API fails
+        setLanguages(getDefaultLanguages());
+        toast.error('Using default languages - backend not available');
+      } finally {
+        setIsLoadingLanguages(false);
+      }
+    };
+
+    loadLanguages();
+  }, []);
+
+  // Default languages fallback
+  const getDefaultLanguages = (): Language[] => [
+    { code: 'en', name: 'English', native_name: 'English', supports_offline: true },
+    { code: 'vi', name: 'Vietnamese', native_name: 'Tiếng Việt', supports_offline: true },
+    { code: 'zh', name: 'Chinese', native_name: '中文', supports_offline: true },
+    { code: 'ja', name: 'Japanese', native_name: '日本語', supports_offline: true },
+    { code: 'ko', name: 'Korean', native_name: '한국어', supports_offline: true },
+    { code: 'fr', name: 'French', native_name: 'Français', supports_offline: true },
+    { code: 'de', name: 'German', native_name: 'Deutsch', supports_offline: true },
+    { code: 'es', name: 'Spanish', native_name: 'Español', supports_offline: true },
+    { code: 'it', name: 'Italian', native_name: 'Italiano', supports_offline: true },
+    { code: 'pt', name: 'Portuguese', native_name: 'Português', supports_offline: true },
+    { code: 'ru', name: 'Russian', native_name: 'Русский', supports_offline: true },
+    { code: 'ar', name: 'Arabic', native_name: 'العربية', supports_offline: true },
+    { code: 'th', name: 'Thai', native_name: 'ไทย', supports_offline: true },
+    { code: 'hi', name: 'Hindi', native_name: 'हिन्दी', supports_offline: true }
+  ];
 
   // Load user settings after login
   useEffect(() => {
@@ -50,6 +140,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
             if (result.data.translate_api) {
               setTranslationEngine(result.data.translate_api);
             }
+            // Note: text2speech_api is loaded but used automatically by the backend service
           }
         } catch (error) {
           console.error('Failed to load user settings:', error);
@@ -226,33 +317,112 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
     }
   };
 
-  const mapToSpeechLang = (langCode: string) => {
-    // If already a locale like en-US or zh-CN, use it. If short code like 'en', map to a sensible default.
-    if (!langCode) return 'en-US';
-    if (langCode.includes('-')) return langCode;
 
-    const short = langCode.toLowerCase();
-    const mapping: Record<string, string> = {
-      en: 'en-US',
-      es: 'es-ES',
-      fr: 'fr-FR',
-      de: 'de-DE',
-      zh: 'zh-CN',
-      ja: 'ja-JP',
-      ko: 'ko-KR',
-      vi: 'vi-VN',
-      ru: 'ru-RU',
-      it: 'it-IT',
-      pt: 'pt-PT',
-    };
+  const handleSpeakText = async (text: string, language: string) => {
+    if (!text.trim()) {
+      toast.error('No text to speak');
+      return;
+    }
 
-    return mapping[short] || `${short}-${short.toUpperCase()}`;
+    if (text.length > 5000) {
+      toast.error('Text too long (max 5000 characters)');
+      return;
+    }
+
+    setIsGeneratingAudio(true);
+    try {
+      // Use the appropriate language for text-to-speech
+      let languageCode = language;
+      if (language === 'auto' && detectedLanguage) {
+        languageCode = detectedLanguage;
+      }
+
+      const response = await text2speechApi.synthesizeText(text, languageCode);
+
+      if (response.success && response.data) {
+        // Create audio object and play
+        const url = window.URL.createObjectURL(response.data);
+        const audio = new Audio(url);
+
+        audio.onloadstart = () => {
+          setIsGeneratingAudio(false);
+          setIsPlayingAudio(true);
+        };
+
+        audio.onended = () => {
+          window.URL.revokeObjectURL(url);
+          setIsPlayingAudio(false);
+        };
+
+        audio.onerror = () => {
+          window.URL.revokeObjectURL(url);
+          setIsGeneratingAudio(false);
+          setIsPlayingAudio(false);
+          toast.error('Failed to play audio');
+        };
+
+        await audio.play();
+      } else {
+        setIsGeneratingAudio(false);
+        toast.error(response.error || 'Failed to generate audio');
+      }
+    } catch (error) {
+      console.error('Error generating audio:', error);
+      setIsGeneratingAudio(false);
+      toast.error('Failed to generate audio');
+    }
   };
 
-  const handleSpeakText = (text: string, language: string) => {
-    if (text.trim()) {
-      const speechLang = mapToSpeechLang(language || targetLanguage || 'en');
-      speechSynthesis.speak(text, speechLang);
+  const handleDownloadAudio = async (text: string, language: string, textType: 'source' | 'translated') => {
+    if (!text.trim()) {
+      toast.error('No text to convert to audio');
+      return;
+    }
+
+    if (text.length > 5000) {
+      toast.error('Text too long (max 5000 characters)');
+      return;
+    }
+
+    setIsGeneratingAudio(true);
+    try {
+      // Use the appropriate language for text-to-speech
+      let languageCode = language;
+      if (textType === 'source' && sourceLanguage === 'auto' && detectedLanguage) {
+        languageCode = detectedLanguage;
+      }
+
+      const response = await text2speechApi.synthesizeText(text, languageCode);
+
+      if (response.success && response.data) {
+        // Create download link
+        const url = window.URL.createObjectURL(response.data);
+        const link = document.createElement('a');
+        link.href = url;
+
+        // Generate filename
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
+        const langCode = languageCode || 'unknown';
+        const prefix = textType === 'source' ? 'source' : 'translated';
+        link.download = `${prefix}_${langCode}_${timestamp}.mp3`;
+
+        // Trigger download
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Clean up
+        window.URL.revokeObjectURL(url);
+
+        toast.success('Audio downloaded successfully');
+      } else {
+        toast.error(response.error || 'Failed to generate audio');
+      }
+    } catch (error) {
+      console.error('Error generating audio:', error);
+      toast.error('Failed to generate audio');
+    } finally {
+      setIsGeneratingAudio(false);
     }
   };
 
@@ -312,6 +482,20 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
   //   }
   // };
 
+  // Show loading state while fetching languages
+  if (isLoadingLanguages) {
+    return (
+      <div className="max-w-5xl mx-auto space-y-6 p-4">
+        <div className="bg-white rounded-lg shadow-md p-8 flex items-center justify-center">
+          <div className="flex items-center space-x-3">
+            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+            <span className="text-gray-600">Loading supported languages...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 p-4">
       {/* Language Selection */}
@@ -328,6 +512,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
               includeAuto={true}
               detectedLanguage={detectedLanguage}
               isDetecting={isDetectingLanguage}
+              isLoading={isLoadingLanguages}
             />
           </div>
 
@@ -347,6 +532,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
               onLanguageChange={setTargetLanguage}
               label="To"
               includeAuto={false}
+              isLoading={isLoadingLanguages}
             />
           </div>
         </div>
@@ -386,20 +572,32 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
                   <Mic className="w-5 h-5" />
                 )}
               </button> */}
-              {typeof window !== 'undefined' && window.speechSynthesis && (
-                <button
-                  onClick={() => handleSpeakText(sourceText, sourceLanguage === 'auto' && detectedLanguage ? detectedLanguage : sourceLanguage)}
-                  disabled={!sourceText || window.speechSynthesis.speaking}
-                  className="p-2.5 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="Read source aloud"
-                >
-                  {window.speechSynthesis.speaking ? (
-                    <VolumeX className="w-4 h-4" />
-                  ) : (
-                    <Volume2 className="w-4 h-4" />
-                  )}
-                </button>
-              )}
+              <button
+                onClick={() => handleSpeakText(sourceText, sourceLanguage === 'auto' && detectedLanguage ? detectedLanguage : sourceLanguage)}
+                disabled={!sourceText || isGeneratingAudio || isPlayingAudio}
+                className="p-2.5 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Read source aloud"
+              >
+                {isGeneratingAudio ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : isPlayingAudio ? (
+                  <VolumeX className="w-4 h-4" />
+                ) : (
+                  <Volume2 className="w-4 h-4" />
+                )}
+              </button>
+              <button
+                onClick={() => handleDownloadAudio(sourceText, sourceLanguage === 'auto' && detectedLanguage ? detectedLanguage : sourceLanguage, 'source')}
+                disabled={!sourceText || isGeneratingAudio}
+                className="p-2.5 rounded-full bg-green-100 text-green-600 hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Download audio"
+              >
+                {isGeneratingAudio ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+              </button>
               <button
                 onClick={() => handleCopyText(sourceText)}
                 disabled={!sourceText}
@@ -473,20 +671,32 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
                 </button>
               )}
 
-              {typeof window !== 'undefined' && window.speechSynthesis && (
-                <button
-                  onClick={() => handleSpeakText(translatedText, targetLanguage)}
-                  disabled={!translatedText || window.speechSynthesis.speaking}
-                  className="p-2.5 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="Read aloud"
-                >
-                  {window.speechSynthesis.speaking ? (
-                    <VolumeX className="w-4 h-4" />
-                  ) : (
-                    <Volume2 className="w-4 h-4" />
-                  )}
-                </button>
-              )}
+              <button
+                onClick={() => handleSpeakText(translatedText, targetLanguage)}
+                disabled={!translatedText || isGeneratingAudio || isPlayingAudio}
+                className="p-2.5 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Read aloud"
+              >
+                {isGeneratingAudio ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : isPlayingAudio ? (
+                  <VolumeX className="w-4 h-4" />
+                ) : (
+                  <Volume2 className="w-4 h-4" />
+                )}
+              </button>
+              <button
+                onClick={() => handleDownloadAudio(translatedText, targetLanguage, 'translated')}
+                disabled={!translatedText || isGeneratingAudio}
+                className="p-2.5 rounded-full bg-green-100 text-green-600 hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Download audio"
+              >
+                {isGeneratingAudio ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+              </button>
               <button
                 onClick={() => handleCopyText(translatedText)}
                 disabled={!translatedText}

@@ -3,24 +3,25 @@ import { ChevronDown } from 'lucide-react';
 import { Language } from '../../types';
 
 interface LanguageSelectorProps {
-  languages: Language[];
+  languages?: Language[];
   selectedLanguage: string;
   onLanguageChange: (language: string) => void;
   label: string;
   includeAuto?: boolean;
   detectedLanguage?: string;
   isDetecting?: boolean;
-
+  isLoading?: boolean;
 }
 
 const LanguageSelector: React.FC<LanguageSelectorProps> = ({
-  languages,
+  languages = [],
   selectedLanguage,
   onLanguageChange,
   label,
   includeAuto = false,
   detectedLanguage = '',
   isDetecting = false,
+  isLoading = false,
 }) => {
 
   return (
@@ -31,8 +32,11 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         </label>
         {selectedLanguage === 'auto' && detectedLanguage && (
           <span className="text-xs font-medium text-blue-600">
-            Detected: {languages.find(lang => lang.code === detectedLanguage)?.name || detectedLanguage}
+            Detected: {languages?.find(lang => lang.code === detectedLanguage)?.name || detectedLanguage}
           </span>
+        )}
+        {isLoading && (
+          <span className="text-xs text-gray-500 font-medium">Loading...</span>
         )}
         {selectedLanguage === 'auto' && isDetecting && !detectedLanguage && (
           <span className="text-xs text-amber-600 flex items-center">
@@ -54,7 +58,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           {includeAuto && (
             <option value="auto">Auto-detect</option>
           )}
-          {languages.map((language) => (
+          {languages && Array.isArray(languages) && languages.map((language) => (
             <option key={language.code} value={language.code}>
               {language.name}
             </option>

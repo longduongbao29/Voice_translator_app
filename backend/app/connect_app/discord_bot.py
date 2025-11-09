@@ -150,7 +150,8 @@ Messages are automatically translated based on your user settings if webhook int
                 await self.handle_translate_command(channel_id, src_lang, target_lang, text_to_translate, data)
             else:
                 # Handle regular message (auto-translate based on user settings)
-                await self.handle_auto_translate(channel_id, content, data)
+                # await self.handle_auto_translate(channel_id, content, data)
+                return 
                 
         except Exception as e:
             logger.error(f"Error processing Discord message: {str(e)}")
@@ -188,7 +189,7 @@ Messages are automatically translated based on your user settings if webhook int
 This Discord channel is not yet configured for translation services.
 
 **To get started:**
-1. Visit the Voice Translator app
+1. Visit the Translator app
 2. Go to **Profile** → **Integrations** → **Discord**
 3. Connect this Discord channel to your account
 4. Configure your translation preferences

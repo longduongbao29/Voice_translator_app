@@ -81,8 +81,8 @@ class TranslationService:
             }
             
             # Add custom headers if provided
-            if endpoint.headers:
-                headers.update(endpoint.headers)
+            if endpoint.meta_data and endpoint.meta_data.get("headers"):
+                headers.update(endpoint.meta_data["headers"])
             
             # Add API key if provided
             if endpoint.api_key:
@@ -97,7 +97,7 @@ class TranslationService:
             
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    endpoint.endpoint_url,
+                    endpoint.api_url,
                     json=data,
                     headers=headers,
                     timeout=30.0

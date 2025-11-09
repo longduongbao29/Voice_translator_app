@@ -40,6 +40,7 @@ class UserSettingsBase(BaseModel):
     trg_lang: Optional[str] = "en"
     translate_api: Optional[str] = "google"
     stt_api: Optional[str] = "groq"
+    text2speech_api: Optional[str] = "elevenlabs"
 
 class UserSettingsCreate(UserSettingsBase):
     user_id: int
@@ -49,6 +50,7 @@ class UserSettingsUpdate(BaseModel):
     trg_lang: Optional[str] = None
     translate_api: Optional[str] = None
     stt_api: Optional[str] = None
+    text2speech_api: Optional[str] = None
 
 class UserSettingsResponse(UserSettingsBase):
     id: int
@@ -59,6 +61,43 @@ class UserSettingsResponse(UserSettingsBase):
     class Config:
         from_attributes = True
 
+# ElevenLabs Settings schemas
+class ElevenLabsSettingsBase(BaseModel):
+    model_id: Optional[str] = "eleven_multilingual_v2"
+    voice_id: Optional[str] = "JBFqnCBsd6RMkjVDRZzb"
+    voice_name: Optional[str] = "George"
+    voice_settings: Optional[dict] = None
+    cloned_voices: Optional[list] = None
+
+class ElevenLabsSettingsCreate(ElevenLabsSettingsBase):
+    user_id: int
+
+class ElevenLabsSettingsUpdate(BaseModel):
+    model_id: Optional[str] = None
+    voice_id: Optional[str] = None
+    voice_name: Optional[str] = None
+    voice_settings: Optional[dict] = None
+    cloned_voices: Optional[list] = None
+
+class ElevenLabsSettingsResponse(ElevenLabsSettingsBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class VoiceCloneRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+    audio_files: list  # List of audio file paths or URLs
+
+class VoiceCloneResponse(BaseModel):
+    voice_id: str
+    name: str
+    status: str
+    
 # Translation schemas
 class TranslationRequest(BaseModel):
     text: str
@@ -109,10 +148,10 @@ class TokenData(BaseModel):
 # Custom Endpoint schemas
 class CustomEndpointBase(BaseModel):
     name: str
-    endpoint_type: str  # 'speech2text' or 'translation'
-    endpoint_url: str
+    endpoint_type: str  # 'speech2text', 'translation', or 'text2speech'
+    api_url: str
     api_key: Optional[str] = None
-    headers: Optional[dict] = None
+    meta_data: Optional[dict] = None
     is_active: Optional[bool] = False  # Default inactive until selected
 
 class CustomEndpointCreate(CustomEndpointBase):
@@ -120,9 +159,9 @@ class CustomEndpointCreate(CustomEndpointBase):
 
 class CustomEndpointUpdate(BaseModel):
     name: Optional[str] = None
-    endpoint_url: Optional[str] = None
+    api_url: Optional[str] = None
     api_key: Optional[str] = None
-    headers: Optional[dict] = None
+    meta_data: Optional[dict] = None
     is_active: Optional[bool] = None
 
 class CustomEndpointResponse(CustomEndpointBase):

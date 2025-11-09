@@ -9,6 +9,10 @@ from app.connect_app.discord_bot import discord_service
 import os
 import atexit
 import asyncio
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 # Setup logging
 log_startup()
 

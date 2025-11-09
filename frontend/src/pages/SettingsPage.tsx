@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.tsx';
-import { userApi } from '../services/api.ts';
-import { UserSettings, CustomEndpoint, WebhookIntegration } from '../types';
-import { Trash2, Edit2, Plus, Settings, Code, Share2 } from 'lucide-react';
+import { userApi, elevenLabsApi } from '../services/api.ts';
+import { UserSettings, CustomEndpoint, WebhookIntegration, ElevenLabsSettings, ElevenLabsVoice, ElevenLabsModel } from '../types';
+import { Trash2, Edit2, Plus, Settings, Code, Share2, Volume2 } from 'lucide-react';
 
 const SettingsPage: React.FC = () => {
     const { user } = useAuth();
@@ -11,6 +11,7 @@ const SettingsPage: React.FC = () => {
         trg_lang: 'en',
         translate_api: 'google',
         stt_api: 'groq',
+        text2speech_api: 'elevenlabs',
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -18,7 +19,7 @@ const SettingsPage: React.FC = () => {
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     // Tab state
-    const [activeTab, setActiveTab] = useState<'general' | 'developer' | 'app'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'developer' | 'app' | 'elevenlabs'>('general');
 
     // Custom endpoints state
     const [customEndpoints, setCustomEndpoints] = useState<CustomEndpoint[]>([]);
@@ -32,6 +33,37 @@ const SettingsPage: React.FC = () => {
     const [editingWebhook, setEditingWebhook] = useState<WebhookIntegration | null>(null);
     const [isAddingWebhook, setIsAddingWebhook] = useState(false);
     const [selectedPlatform, setSelectedPlatform] = useState<'slack' | 'discord' | 'zalo' | 'custom'>('discord');
+
+    // ElevenLabs state
+    const [elevenLabsSettings, setElevenLabsSettings] = useState<ElevenLabsSettings>({
+        model_id: 'eleven_multilingual_v2',
+        voice_id: 'JBFqnCBsd6RMkjVDRZzb',
+        voice_name: 'George',
+        voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.8,
+            style: 0.0,
+            use_speaker_boost: true
+        },
+        cloned_voices: []
+    });
+    // const [availableVoices, setAvailableVoices] = useState<ElevenLabsVoice[]>([]);
+    // const [availableModels, setAvailableModels] = useState<ElevenLabsModel[]>([]);
+    // const [loadingElevenLabs, setLoadingElevenLabs] = useState(false);
+    // const [isCloning, setIsCloning] = useState(false);
+    // const [cloneFiles, setCloneFiles] = useState<File[]>([]);
+
+    // Additional ElevenLabs state for UI
+    const [voices, setVoices] = useState<ElevenLabsVoice[]>([]);
+    const [models, setModels] = useState<ElevenLabsModel[]>([]);
+    const [previewLoading, setPreviewLoading] = useState<string | null>(null);
+    const [cloneLoading, setCloneLoading] = useState(false);
+    const [saveLoading, setSaveLoading] = useState(false);
+    const [cloneForm, setCloneForm] = useState({
+        name: '',
+        description: '',
+        files: [] as File[]
+    });
 
 
     const fetchSettings = async () => {
@@ -85,11 +117,140 @@ const SettingsPage: React.FC = () => {
         }
     };
 
+    const fetchElevenLabsSettings = async () => {
+        try {
+            // setLoadingElevenLabs(true);
+
+            // Fetch settings, voices, and models in parallel
+            const [settingsResult, voicesResult, modelsResult] = await Promise.all([
+                elevenLabsApi.getSettings(),
+                elevenLabsApi.getVoices(),
+                elevenLabsApi.getModels()
+            ]);
+
+            if (settingsResult.success && settingsResult.data) {
+                setElevenLabsSettings(settingsResult.data);
+            }
+
+            if (voicesResult.success && voicesResult.data) {
+                setVoices(voicesResult.data.voices || []);
+            }
+
+            if (modelsResult.success && modelsResult.data) {
+                setModels(modelsResult.data.models || []);
+            }
+
+        } catch (err: any) {
+            setError(err.message || 'Failed to fetch ElevenLabs data');
+        } finally {
+            // setLoadingElevenLabs(false);
+        }
+    };
+
+    const handlePreviewVoice = async (voiceId: string) => {
+        try {
+            setPreviewLoading(voiceId);
+            // Create a simple preview text
+            const previewText = "Hello, this is a voice preview from ElevenLabs.";
+
+            // Create a FormData object
+            const formData = new FormData();
+            formData.append('text', previewText);
+            formData.append('voice_id', voiceId);
+
+            const response = await fetch('/api/v1/text2speech/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: formData
+            });
+
+            if (response.ok) {
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                await audio.play();
+
+                // Clean up the URL after playing
+                audio.onended = () => URL.revokeObjectURL(audioUrl);
+            } else {
+                setError('Failed to preview voice');
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to preview voice');
+        } finally {
+            setPreviewLoading(null);
+        }
+    };
+
+    const handleCloneVoice = async () => {
+        if (!cloneForm.name || cloneForm.files.length === 0) {
+            setError('Please provide a name and at least one audio file');
+            return;
+        }
+
+        try {
+            setCloneLoading(true);
+
+            const formData = new FormData();
+            formData.append('name', cloneForm.name);
+            if (cloneForm.description) {
+                formData.append('description', cloneForm.description);
+            }
+
+            cloneForm.files.forEach((file, index) => {
+                formData.append(`files`, file);
+            });
+
+            const result = await elevenLabsApi.cloneVoice(cloneForm.name, cloneForm.description, cloneForm.files);
+
+            if (result.success && result.data) {
+                // Refresh ElevenLabs settings to get the new cloned voice
+                await fetchElevenLabsSettings();
+
+                // Reset the form
+                setCloneForm({
+                    name: '',
+                    description: '',
+                    files: []
+                });
+
+                setSuccessMessage('Voice cloned successfully!');
+            } else {
+                setError(result.error || 'Failed to clone voice');
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to clone voice');
+        } finally {
+            setCloneLoading(false);
+        }
+    };
+
+    const saveElevenLabsSettings = async () => {
+        try {
+            setSaveLoading(true);
+
+            const result = await elevenLabsApi.updateSettings(elevenLabsSettings);
+
+            if (result.success) {
+                setSuccessMessage('ElevenLabs settings saved successfully!');
+            } else {
+                setError(result.error || 'Failed to save ElevenLabs settings');
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to save ElevenLabs settings');
+        } finally {
+            setSaveLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (user) {
             fetchSettings(); // Load user settings for general tab
             fetchCustomEndpoints();
             fetchWebhooks();
+            fetchElevenLabsSettings();
         }
     }, [user]);
 
@@ -300,6 +461,19 @@ const SettingsPage: React.FC = () => {
                                 Ứng dụng
                             </span>
                         </button>
+
+                        <button
+                            className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'elevenlabs'
+                                ? 'border-primary-500 text-primary-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                            onClick={() => setActiveTab('elevenlabs')}
+                        >
+                            <span className="flex items-center">
+                                <Volume2 className="w-5 h-5 mr-2" />
+                                ElevenLabs
+                            </span>
+                        </button>
                     </nav>
                 </div>
 
@@ -396,7 +570,32 @@ const SettingsPage: React.FC = () => {
                                         {customEndpoints
                                             .filter(ep => ep.endpoint_type === 'speech2text')
                                             .map(ep => (
-                                                <option key={ep.id} value={`custom_${ep.id}`}>{ep.name}</option>
+                                                <option key={ep.id} value={ep.name}>
+                                                    {ep.name} (Custom)
+                                                </option>
+                                            ))
+                                        }
+                                    </select>
+                                </div>
+
+                                <div className="mb-4">
+                                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="text2speech_api">
+                                        Công cụ chuyển đổi văn bản thành giọng nói ưu tiên
+                                    </label>
+                                    <select
+                                        id="text2speech_api"
+                                        name="text2speech_api"
+                                        value={settings.text2speech_api}
+                                        onChange={handleSettingsChange}
+                                        className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                    >
+                                        <option value="elevenlabs">ElevenLabs API</option>
+                                        {customEndpoints
+                                            .filter(ep => ep.endpoint_type === 'text2speech')
+                                            .map(ep => (
+                                                <option key={ep.id} value={ep.name}>
+                                                    {ep.name} (Custom)
+                                                </option>
                                             ))
                                         }
                                     </select>
@@ -455,7 +654,7 @@ const SettingsPage: React.FC = () => {
                                                         <div>
                                                             <h4 className="font-medium">{endpoint.name}</h4>
                                                             <p className="text-sm text-gray-600">Type: {endpoint.endpoint_type}</p>
-                                                            <p className="text-xs text-gray-500 mt-1">{endpoint.endpoint_url}</p>
+                                                            <p className="text-xs text-gray-500 mt-1">{endpoint.api_url}</p>
                                                         </div>
                                                         <div className="flex space-x-2">
                                                             <button
@@ -489,23 +688,23 @@ const SettingsPage: React.FC = () => {
                                                     const formEl = e.currentTarget;
                                                     const nameEl = formEl.elements.namedItem('name') as HTMLInputElement;
                                                     const endpointTypeEl = formEl.elements.namedItem('endpoint_type') as HTMLSelectElement;
-                                                    const endpointUrlEl = formEl.elements.namedItem('endpoint_url') as HTMLInputElement;
+                                                    const apiUrlEl = formEl.elements.namedItem('api_url') as HTMLInputElement;
                                                     const apiKeyEl = formEl.elements.namedItem('api_key') as HTMLInputElement;
 
                                                     if (editingEndpoint) {
                                                         const updatedEndpoint: CustomEndpoint = {
                                                             ...editingEndpoint,
                                                             name: nameEl.value,
-                                                            endpoint_type: endpointTypeEl.value as 'speech2text' | 'translation',
-                                                            endpoint_url: endpointUrlEl.value,
+                                                            endpoint_type: endpointTypeEl.value as 'speech2text' | 'translation' | 'text2speech',
+                                                            api_url: apiUrlEl.value,
                                                             api_key: apiKeyEl.value || editingEndpoint.api_key
                                                         };
                                                         handleUpdateEndpoint(updatedEndpoint);
                                                     } else {
                                                         const newEndpoint: CustomEndpoint = {
                                                             name: nameEl.value,
-                                                            endpoint_type: endpointTypeEl.value as 'speech2text' | 'translation',
-                                                            endpoint_url: endpointUrlEl.value,
+                                                            endpoint_type: endpointTypeEl.value as 'speech2text' | 'translation' | 'text2speech',
+                                                            api_url: apiUrlEl.value,
                                                             api_key: apiKeyEl.value || undefined,
                                                             is_active: true
                                                         };
@@ -535,6 +734,7 @@ const SettingsPage: React.FC = () => {
                                                         >
                                                             <option value="translation">Translation</option>
                                                             <option value="speech2text">Speech to Text</option>
+                                                            <option value="text2speech">Text to Speech</option>
                                                         </select>
                                                     </div>
 
@@ -543,8 +743,8 @@ const SettingsPage: React.FC = () => {
                                                             Endpoint URL
                                                         </label>
                                                         <input
-                                                            name="endpoint_url"
-                                                            defaultValue={editingEndpoint?.endpoint_url || ''}
+                                                            name="api_url"
+                                                            defaultValue={editingEndpoint?.api_url || ''}
                                                             className="w-full p-2 border rounded"
                                                             required
                                                         />
@@ -830,6 +1030,234 @@ const SettingsPage: React.FC = () => {
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ElevenLabs Settings Tab */}
+                    {activeTab === 'elevenlabs' && (
+                        <div className="mt-4">
+                            <div className="space-y-6">
+                                {/* Model Selection */}
+                                <div className="mb-6">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Model
+                                    </label>
+                                    <select
+                                        value={elevenLabsSettings?.model_id || 'eleven_multilingual_v2'}
+                                        onChange={(e) => setElevenLabsSettings(prev => ({ ...prev!, model_id: e.target.value }))}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                    >
+                                        {models.map((model) => (
+                                            <option key={model.model_id} value={model.model_id}>
+                                                {model.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Voice Selection */}
+                                <div className="mb-6">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Voice
+                                    </label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {voices.map((voice) => (
+                                            <div
+                                                key={voice.voice_id}
+                                                className={`border rounded-lg p-3 cursor-pointer transition-colors ${elevenLabsSettings?.voice_id === voice.voice_id
+                                                    ? 'border-blue-500 bg-blue-50'
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                                    }`}
+                                                onClick={() => setElevenLabsSettings(prev => ({ ...prev!, voice_id: voice.voice_id }))}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <h4 className="text-sm font-medium text-gray-900">{voice.name}</h4>
+                                                        <p className="text-xs text-gray-500 capitalize">{voice.category}</p>
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handlePreviewVoice(voice.voice_id);
+                                                        }}
+                                                        className="text-blue-600 hover:text-blue-800 text-sm"
+                                                        disabled={previewLoading === voice.voice_id}
+                                                    >
+                                                        {previewLoading === voice.voice_id ? '...' : '▶️'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Voice Settings */}
+                                <div className="mb-6">
+                                    <h3 className="text-lg font-medium text-gray-900 mb-4">Voice Settings</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Stability: {elevenLabsSettings?.voice_settings?.stability || 0.5}
+                                            </label>
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max="1"
+                                                step="0.1"
+                                                value={elevenLabsSettings?.voice_settings?.stability || 0.5}
+                                                onChange={(e) => setElevenLabsSettings(prev => ({
+                                                    ...prev!,
+                                                    voice_settings: {
+                                                        ...prev?.voice_settings,
+                                                        stability: parseFloat(e.target.value)
+                                                    }
+                                                }))}
+                                                className="w-full"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Similarity Boost: {elevenLabsSettings?.voice_settings?.similarity_boost || 0.5}
+                                            </label>
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max="1"
+                                                step="0.1"
+                                                value={elevenLabsSettings?.voice_settings?.similarity_boost || 0.5}
+                                                onChange={(e) => setElevenLabsSettings(prev => ({
+                                                    ...prev!,
+                                                    voice_settings: {
+                                                        ...prev?.voice_settings,
+                                                        similarity_boost: parseFloat(e.target.value)
+                                                    }
+                                                }))}
+                                                className="w-full"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Style: {elevenLabsSettings?.voice_settings?.style || 0}
+                                            </label>
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max="1"
+                                                step="0.1"
+                                                value={elevenLabsSettings?.voice_settings?.style || 0}
+                                                onChange={(e) => setElevenLabsSettings(prev => ({
+                                                    ...prev!,
+                                                    voice_settings: {
+                                                        ...prev?.voice_settings,
+                                                        style: parseFloat(e.target.value)
+                                                    }
+                                                }))}
+                                                className="w-full"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Voice Cloning */}
+                                <div className="mb-6">
+                                    <h3 className="text-lg font-medium text-gray-900 mb-4">Voice Cloning</h3>
+                                    <div className="bg-gray-50 p-4 rounded-lg">
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Voice Name
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={cloneForm.name}
+                                                onChange={(e) => setCloneForm(prev => ({ ...prev, name: e.target.value }))}
+                                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                                placeholder="Enter a name for the cloned voice"
+                                            />
+                                        </div>
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Description (Optional)
+                                            </label>
+                                            <textarea
+                                                value={cloneForm.description}
+                                                onChange={(e) => setCloneForm(prev => ({ ...prev, description: e.target.value }))}
+                                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                                rows={3}
+                                                placeholder="Describe the voice characteristics"
+                                            />
+                                        </div>
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Audio Files
+                                            </label>
+                                            <input
+                                                type="file"
+                                                multiple
+                                                accept="audio/*"
+                                                onChange={(e) => setCloneForm(prev => ({ ...prev, files: Array.from(e.target.files || []) }))}
+                                                className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Upload 1-5 audio files (max 10MB each). Better quality audio produces better voice clones.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={handleCloneVoice}
+                                            disabled={!cloneForm.name || cloneForm.files.length === 0 || cloneLoading}
+                                            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {cloneLoading ? 'Cloning Voice...' : 'Clone Voice'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Cloned Voices */}
+                                {elevenLabsSettings?.cloned_voices && elevenLabsSettings.cloned_voices.length > 0 && (
+                                    <div className="mb-6">
+                                        <h3 className="text-lg font-medium text-gray-900 mb-4">Your Cloned Voices</h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {elevenLabsSettings.cloned_voices.map((voice) => (
+                                                <div
+                                                    key={voice.voice_id}
+                                                    className={`border rounded-lg p-3 cursor-pointer transition-colors ${elevenLabsSettings?.voice_id === voice.voice_id
+                                                        ? 'border-blue-500 bg-blue-50'
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                        }`}
+                                                    onClick={() => setElevenLabsSettings(prev => ({ ...prev!, voice_id: voice.voice_id }))}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <h4 className="text-sm font-medium text-gray-900">{voice.name}</h4>
+                                                            <p className="text-xs text-gray-500">Cloned Voice</p>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handlePreviewVoice(voice.voice_id);
+                                                            }}
+                                                            className="text-blue-600 hover:text-blue-800 text-sm"
+                                                            disabled={previewLoading === voice.voice_id}
+                                                        >
+                                                            {previewLoading === voice.voice_id ? '...' : '▶️'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Save Button */}
+                                <div className="pt-6 border-t">
+                                    <button
+                                        onClick={saveElevenLabsSettings}
+                                        disabled={saveLoading}
+                                        className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {saveLoading ? 'Saving...' : 'Save ElevenLabs Settings'}
+                                    </button>
                                 </div>
                             </div>
                         </div>

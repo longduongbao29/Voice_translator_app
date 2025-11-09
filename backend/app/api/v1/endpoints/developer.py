@@ -49,9 +49,9 @@ async def create_custom_endpoint(
             user_id=user.id,
             name=endpoint.name,
             endpoint_type=endpoint.endpoint_type,
-            endpoint_url=endpoint.endpoint_url,
+            api_url=endpoint.api_url,
             api_key=endpoint.api_key,
-            headers=endpoint.headers,
+            meta_data=endpoint.meta_data,
             is_active=endpoint.is_active
         )
         db.add(db_endpoint)
