@@ -97,6 +97,7 @@ class VoiceCloneResponse(BaseModel):
     voice_id: str
     name: str
     status: str
+    requires_verification: Optional[bool] = False
     
 # Translation schemas
 class TranslationRequest(BaseModel):

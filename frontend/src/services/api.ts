@@ -761,11 +761,26 @@ export const elevenLabsApi = {
   },
 
   // Clone voice
-  cloneVoice: async (name: string, description: string, files: File[]): Promise<ApiResponse<any>> => {
+  cloneVoice: async (
+    name: string,
+    description?: string,
+    files: File[] = [],
+    removeBackgroundNoise: boolean = true,
+    labels?: string
+  ): Promise<ApiResponse<any>> => {
     try {
       const formData = new FormData();
       formData.append('name', name);
-      if (description) formData.append('description', description);
+
+      if (description) {
+        formData.append('description', description);
+      }
+
+      if (labels) {
+        formData.append('labels', labels);
+      }
+
+      formData.append('remove_background_noise', removeBackgroundNoise ? 'true' : 'false');
 
       files.forEach(file => {
         formData.append('files', file);

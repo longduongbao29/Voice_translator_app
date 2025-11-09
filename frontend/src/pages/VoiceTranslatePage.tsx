@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'react-hot-toast';
 import { speechToTextApi, text2speechApi } from '../services/api.ts';
 import { Mic, Volume2, Download, Copy, Play, Pause } from 'lucide-react';
 import { useAudioRecorder } from '../hooks/useAudioRecorder.ts';
@@ -206,6 +207,97 @@ const VoiceTranslatePage: React.FC<VoiceTranslatePageProps> = () => {
         } catch (error) {
             console.error('Failed to copy text:', error);
         }
+    };
+
+    // Download original recorded audio as WAV
+    const downloadOriginalAudio = async () => {
+        if (!recordedAudioBlobRef.current) {
+            console.error('No recorded audio available');
+            toast.error('No recorded audio to download');
+            return;
+        }
+
+        try {
+            const audioBlob = recordedAudioBlobRef.current;
+
+            // Convert to WAV format using Web Audio API
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+            // Convert AudioBuffer to WAV
+            const wavBlob = await audioBufferToWav(audioBuffer);
+
+            // Create download link
+            const url = URL.createObjectURL(wavBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `recorded-audio-${Date.now()}.wav`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            console.log('✅ Audio download initiated as WAV');
+            toast.success('Audio downloaded successfully!');
+        } catch (error) {
+            console.error('Failed to download audio:', error);
+            toast.error('Failed to convert to WAV, downloading original format');
+            // Fallback: download original blob with .wav extension
+            const url = URL.createObjectURL(recordedAudioBlobRef.current);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `recorded-audio-${Date.now()}.wav`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    };
+
+    // Helper function to convert AudioBuffer to WAV blob
+    const audioBufferToWav = (buffer: AudioBuffer): Promise<Blob> => {
+        return new Promise((resolve) => {
+            const length = buffer.length;
+            const numberOfChannels = buffer.numberOfChannels;
+            const sampleRate = buffer.sampleRate;
+            const arrayBuffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
+            const view = new DataView(arrayBuffer);
+
+            // WAV header
+            const writeString = (offset: number, string: string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + length * numberOfChannels * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, numberOfChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+            view.setUint16(32, numberOfChannels * 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, length * numberOfChannels * 2, true);
+
+            // Convert float samples to 16-bit PCM
+            let offset = 44;
+            for (let i = 0; i < length; i++) {
+                for (let channel = 0; channel < numberOfChannels; channel++) {
+                    const sample = buffer.getChannelData(channel)[i];
+                    const intSample = Math.max(-1, Math.min(1, sample)) * 0x7FFF;
+                    view.setInt16(offset, intSample, true);
+                    offset += 2;
+                }
+            }
+
+            resolve(new Blob([arrayBuffer], { type: 'audio/wav' }));
+        });
     };
 
     // Format file size
@@ -662,8 +754,16 @@ const VoiceTranslatePage: React.FC<VoiceTranslatePageProps> = () => {
                                                     <button
                                                         onClick={toggleOriginalAudio}
                                                         className="flex items-center justify-center w-6 h-6 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-all duration-200"
+                                                        title="Play/Pause original audio"
                                                     >
                                                         {isPlayingOriginal ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                                                    </button>
+                                                    <button
+                                                        onClick={downloadOriginalAudio}
+                                                        className="flex items-center justify-center w-6 h-6 bg-gray-500 text-white rounded-full hover:bg-gray-600 transition-all duration-200"
+                                                        title="Download original audio (WAV)"
+                                                    >
+                                                        <Download className="w-3 h-3" />
                                                     </button>
                                                     <span className="text-xs text-gray-500 min-w-[24px]">
                                                         {Math.floor(originalAudioCurrentTime)}s

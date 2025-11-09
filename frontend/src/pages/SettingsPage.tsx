@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.tsx';
-import { userApi, elevenLabsApi } from '../services/api.ts';
+import { userApi, elevenLabsApi, text2speechApi } from '../services/api.ts';
 import { UserSettings, CustomEndpoint, WebhookIntegration, ElevenLabsSettings, ElevenLabsVoice, ElevenLabsModel } from '../types';
 import { Trash2, Edit2, Plus, Settings, Code, Share2, Volume2 } from 'lucide-react';
 
@@ -119,8 +119,6 @@ const SettingsPage: React.FC = () => {
 
     const fetchElevenLabsSettings = async () => {
         try {
-            // setLoadingElevenLabs(true);
-
             // Fetch settings, voices, and models in parallel
             const [settingsResult, voicesResult, modelsResult] = await Promise.all([
                 elevenLabsApi.getSettings(),
@@ -134,51 +132,90 @@ const SettingsPage: React.FC = () => {
 
             if (voicesResult.success && voicesResult.data) {
                 setVoices(voicesResult.data.voices || []);
+            } else {
+                // Fallback voices if API fails
+                setVoices([
+                    { voice_id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', category: 'cloned' },
+                    { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella', category: 'premade' },
+                    { voice_id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli', category: 'premade' },
+                    { voice_id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh', category: 'premade' }
+                ]);
             }
 
             if (modelsResult.success && modelsResult.data) {
                 setModels(modelsResult.data.models || []);
+            } else {
+                // Fallback models if API fails
+                setModels([
+                    { model_id: 'eleven_multilingual_v2', name: 'Eleven Multilingual v2', description: 'Multilingual model supporting various languages' },
+                    { model_id: 'eleven_monolingual_v1', name: 'Eleven Monolingual v1', description: 'English-only model with high quality' },
+                    { model_id: 'eleven_turbo_v2', name: 'Eleven Turbo v2', description: 'Fast generation model for quick results' }
+                ]);
             }
 
         } catch (err: any) {
-            setError(err.message || 'Failed to fetch ElevenLabs data');
-        } finally {
-            // setLoadingElevenLabs(false);
+            console.error('ElevenLabs fetch error:', err);
+            setError('Failed to fetch ElevenLabs data. Using fallback voices.');
+
+            // Set fallback data on error
+            setVoices([
+                { voice_id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', category: 'cloned' },
+                { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella', category: 'premade' },
+                { voice_id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli', category: 'premade' },
+                { voice_id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh', category: 'premade' }
+            ]);
+            setModels([
+                { model_id: 'eleven_multilingual_v2', name: 'Eleven Multilingual v2', description: 'Multilingual model supporting various languages' },
+                { model_id: 'eleven_monolingual_v1', name: 'Eleven Monolingual v1', description: 'English-only model with high quality' },
+                { model_id: 'eleven_turbo_v2', name: 'Eleven Turbo v2', description: 'Fast generation model for quick results' }
+            ]);
         }
     };
 
     const handlePreviewVoice = async (voiceId: string) => {
         try {
             setPreviewLoading(voiceId);
+            setError(null); // Clear any previous errors
+
             // Create a simple preview text
-            const previewText = "Hello, this is a voice preview from ElevenLabs.";
+            const previewText = "Hello, this is a voice preview from ElevenLabs. How does this voice sound to you?";
 
-            // Create a FormData object
-            const formData = new FormData();
-            formData.append('text', previewText);
-            formData.append('voice_id', voiceId);
+            // Use the text2speechApi from our services
+            const response = await text2speechApi.synthesizeText(previewText, 'en', voiceId);
 
-            const response = await fetch('/api/v1/text2speech/', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: formData
-            });
+            if (response.success && response.data) {
+                // response.data is a Blob containing the audio
+                const audioBlob = response.data;
 
-            if (response.ok) {
-                const audioBlob = await response.blob();
+                // Create audio URL and play
                 const audioUrl = URL.createObjectURL(audioBlob);
                 const audio = new Audio(audioUrl);
+
+                // Add error handling for audio playback
+                audio.onerror = () => {
+                    setError('Failed to play audio preview. Please check your audio settings.');
+                    URL.revokeObjectURL(audioUrl);
+                };
+
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                };
+
+                // Set volume for better experience
+                audio.volume = 0.8;
+
                 await audio.play();
 
-                // Clean up the URL after playing
-                audio.onended = () => URL.revokeObjectURL(audioUrl);
+                // Show success message
+                setSuccessMessage('Voice preview played successfully!');
+                setTimeout(() => setSuccessMessage(null), 3000);
+
             } else {
-                setError('Failed to preview voice');
+                setError(response.error || 'Failed to generate voice preview. Please try again.');
             }
         } catch (err: any) {
-            setError(err.message || 'Failed to preview voice');
+            console.error('Preview voice error:', err);
+            setError(err.message || 'Failed to preview voice. Please check your connection.');
         } finally {
             setPreviewLoading(null);
         }
@@ -192,18 +229,15 @@ const SettingsPage: React.FC = () => {
 
         try {
             setCloneLoading(true);
+            setError(null); // Clear previous errors
 
-            const formData = new FormData();
-            formData.append('name', cloneForm.name);
-            if (cloneForm.description) {
-                formData.append('description', cloneForm.description);
-            }
-
-            cloneForm.files.forEach((file, index) => {
-                formData.append(`files`, file);
-            });
-
-            const result = await elevenLabsApi.cloneVoice(cloneForm.name, cloneForm.description, cloneForm.files);
+            const result = await elevenLabsApi.cloneVoice(
+                cloneForm.name,
+                cloneForm.description,
+                cloneForm.files,
+                true, // removeBackgroundNoise
+                undefined // labels
+            );
 
             if (result.success && result.data) {
                 // Refresh ElevenLabs settings to get the new cloned voice
@@ -218,10 +252,50 @@ const SettingsPage: React.FC = () => {
 
                 setSuccessMessage('Voice cloned successfully!');
             } else {
-                setError(result.error || 'Failed to clone voice');
+                // Handle API errors more gracefully
+                let errorMsg = 'Failed to clone voice';
+
+                if (result.error) {
+                    if (typeof result.error === 'string') {
+                        errorMsg = result.error;
+                    } else if (typeof result.error === 'object' && result.error !== null) {
+                        const errorObj = result.error as any;
+                        errorMsg = errorObj.detail || JSON.stringify(result.error);
+                    } else {
+                        errorMsg = String(result.error);
+                    }
+                }
+
+                // Show user-friendly error messages
+                if (errorMsg.includes('subscription')) {
+                    errorMsg = '⚠️ Voice cloning requires an upgraded ElevenLabs subscription. Please upgrade your plan to use this feature.';
+                } else if (errorMsg.includes('credits')) {
+                    errorMsg = '⚠️ Insufficient credits in your ElevenLabs account. Please add more credits to continue.';
+                } else if (errorMsg.includes('file')) {
+                    errorMsg = '⚠️ Invalid or corrupted audio file. Please use high-quality WAV, MP3, or FLAC files.';
+                }
+
+                setError(errorMsg);
             }
         } catch (err: any) {
-            setError(err.message || 'Failed to clone voice');
+            console.error('Voice cloning error:', err);
+
+            let errorMsg = 'An unexpected error occurred while cloning voice';
+
+            if (err.response?.data?.detail) {
+                errorMsg = err.response.data.detail;
+            } else if (err.message) {
+                errorMsg = err.message;
+            }
+
+            // Apply user-friendly formatting for common errors
+            if (errorMsg.includes('subscription')) {
+                errorMsg = '⚠️ Voice cloning requires an upgraded ElevenLabs subscription. Please upgrade your plan to use this feature.';
+            } else if (errorMsg.includes('Network Error') || errorMsg.includes('timeout')) {
+                errorMsg = '🌐 Network error. Please check your connection and try again.';
+            }
+
+            setError(errorMsg);
         } finally {
             setCloneLoading(false);
         }
@@ -409,7 +483,7 @@ const SettingsPage: React.FC = () => {
 
             {error && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                    {error}
+                    {typeof error === 'string' ? error : JSON.stringify(error)}
                 </div>
             )}
 
@@ -1082,10 +1156,15 @@ const SettingsPage: React.FC = () => {
                                                             e.stopPropagation();
                                                             handlePreviewVoice(voice.voice_id);
                                                         }}
-                                                        className="text-blue-600 hover:text-blue-800 text-sm"
+                                                        className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                         disabled={previewLoading === voice.voice_id}
+                                                        title={previewLoading === voice.voice_id ? 'Playing preview...' : 'Play voice preview'}
                                                     >
-                                                        {previewLoading === voice.voice_id ? '...' : '▶️'}
+                                                        {previewLoading === voice.voice_id ? (
+                                                            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                                        ) : (
+                                                            <Volume2 className="w-4 h-4" />
+                                                        )}
                                                     </button>
                                                 </div>
                                             </div>
@@ -1237,10 +1316,15 @@ const SettingsPage: React.FC = () => {
                                                                 e.stopPropagation();
                                                                 handlePreviewVoice(voice.voice_id);
                                                             }}
-                                                            className="text-blue-600 hover:text-blue-800 text-sm"
+                                                            className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                             disabled={previewLoading === voice.voice_id}
+                                                            title={previewLoading === voice.voice_id ? 'Playing preview...' : 'Play voice preview'}
                                                         >
-                                                            {previewLoading === voice.voice_id ? '...' : '▶️'}
+                                                            {previewLoading === voice.voice_id ? (
+                                                                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                                            ) : (
+                                                                <Volume2 className="w-4 h-4" />
+                                                            )}
                                                         </button>
                                                     </div>
                                                 </div>

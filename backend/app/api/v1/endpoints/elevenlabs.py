@@ -2,7 +2,7 @@ import os
 import json
 from typing import Optional, List
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.database.postgres import get_db
@@ -254,8 +254,10 @@ async def test_elevenlabs_api():
 
 @router.post("/clone-voice", response_model=VoiceCloneResponse)
 async def clone_voice(
-    name: str,
-    description: Optional[str] = None,
+    name: str = Form(...),
+    description: Optional[str] = Form(None),
+    remove_background_noise: Optional[bool] = Form(True),
+    labels: Optional[str] = Form(None),
     files: List[UploadFile] = File(...),
     db: Session = Depends(get_db),
     credentials: HTTPAuthorizationCredentials = Depends(security)
@@ -277,11 +279,43 @@ async def clone_voice(
         if not api_key:
             raise HTTPException(status_code=400, detail="ElevenLabs API key not configured")
         
-        # Prepare files for upload
+        # Validate files - should be audio files
+        allowed_audio_types = [
+            "audio/wav", "audio/mp3", "audio/mpeg", "audio/mp4", "audio/m4a",
+            "audio/ogg", "audio/flac", "audio/webm", "audio/aac"
+        ]
+        
+        for file in files:
+            if file.content_type not in allowed_audio_types:
+                logger.warning(f"Invalid file type: {file.content_type} for file: {file.filename}")
+                # Allow anyway but log warning - ElevenLabs will handle validation
+        
+        # Prepare files for upload - ElevenLabs expects files as multipart form data
         upload_files = []
+        total_size = 0
+        
         for file in files:
             content = await file.read()
+            file_size = len(content)
+            total_size += file_size
+            
+            logger.info(f"Processing file: {file.filename}, size: {file_size} bytes, type: {file.content_type}")
             upload_files.append(("files", (file.filename, content, file.content_type)))
+        
+        logger.info(f"Voice cloning request - User: {username}, Name: {name}, Files: {len(files)}, Total size: {total_size} bytes")
+        
+        # Prepare form data according to API specification
+        form_data = {
+            "name": name,
+        }
+        
+        # Add optional fields only if they have values
+        if description:
+            form_data["description"] = description
+        if labels:
+            form_data["labels"] = labels
+        if remove_background_noise is not None:
+            form_data["remove_background_noise"] = str(remove_background_noise).lower()
         
         # Call ElevenLabs voice cloning API
         async with httpx.AsyncClient() as client:
@@ -289,15 +323,18 @@ async def clone_voice(
                 "https://api.elevenlabs.io/v1/voices/add",
                 headers={"xi-api-key": api_key},
                 files=upload_files,
-                data={
-                    "name": name,
-                    "description": description or f"Voice cloned by {username}"
-                },
+                data=form_data,
                 timeout=60.0
             )
             
             if response.status_code == 200:
                 result = response.json()
+                
+                # Log the response for debugging
+                logger.info(f"ElevenLabs voice cloning response: {result}")
+                
+                # Check if verification is required
+                requires_verification = result.get("requires_verification", False)
                 
                 # Save cloned voice to user settings
                 settings = db.query(ElevenLabsSettings).filter_by(user_id=user.id).first()
@@ -305,23 +342,144 @@ async def clone_voice(
                     if not settings.cloned_voices:
                         settings.cloned_voices = []
                     
-                    settings.cloned_voices.append({
+                    cloned_voice_data = {
                         "voice_id": result["voice_id"],
                         "name": name,
-                        "description": description,
-                        "created_at": str(datetime.now())
-                    })
+                        "description": description or f"Voice cloned by {username}",
+                        "created_at": str(datetime.now()),
+                        "requires_verification": requires_verification
+                    }
+                    
+                    settings.cloned_voices.append(cloned_voice_data)
                     db.commit()
                 
                 return VoiceCloneResponse(
                     voice_id=result["voice_id"],
                     name=name,
-                    status="success"
+                    status="success" if not requires_verification else "pending_verification",
+                    requires_verification=requires_verification
                 )
             else:
-                logger.error(f"Voice cloning failed: {response.status_code} - {response.text}")
-                raise HTTPException(status_code=400, detail="Voice cloning failed")
+                error_text = response.text
+                logger.error(f"Voice cloning failed: {response.status_code} - {error_text}")
                 
+                # Try to parse error response from ElevenLabs
+                try:
+                    error_data = response.json()
+                    
+                    # Handle nested error structure from ElevenLabs
+                    if "detail" in error_data and isinstance(error_data["detail"], dict):
+                        nested_detail = error_data["detail"]
+                        status = nested_detail.get("status", "unknown_error")
+                        message = nested_detail.get("message", "Unknown error occurred")
+                        
+                        # Map specific ElevenLabs errors to user-friendly messages
+                        if status == "can_not_use_instant_voice_cloning":
+                            error_detail = "Your subscription doesn't have access to voice cloning. Please upgrade your ElevenLabs plan."
+                        elif status == "insufficient_credits":
+                            error_detail = "Insufficient credits in your ElevenLabs account."
+                        elif status == "file_too_large":
+                            error_detail = "Audio file is too large. Please use smaller files."
+                        elif status == "invalid_file_format":
+                            error_detail = "Invalid audio file format. Please use WAV, MP3, or FLAC files."
+                        else:
+                            error_detail = f"ElevenLabs Error: {message}"
+                    
+                    elif "detail" in error_data:
+                        error_detail = str(error_data["detail"])
+                    else:
+                        error_detail = error_text
+                        
+                except Exception as parse_error:
+                    logger.warning(f"Failed to parse error response: {parse_error}")
+                    error_detail = error_text
+                
+                # Use appropriate HTTP status code
+                if response.status_code == 400:
+                    status_code = 400  # Bad Request
+                elif response.status_code == 401:
+                    status_code = 401  # Unauthorized
+                elif response.status_code == 403:
+                    status_code = 403  # Forbidden (subscription issue)
+                elif response.status_code == 429:
+                    status_code = 429  # Too Many Requests
+                else:
+                    status_code = 502  # Bad Gateway (external service error)
+                
+                raise HTTPException(
+                    status_code=status_code,
+                    detail=error_detail
+                )
+                
+    except HTTPException:
+        # Re-raise HTTPExceptions as-is (don't catch our own raised exceptions)
+        raise
     except Exception as e:
         logger.error(f"Error cloning voice: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/clone-voice/validate")
+async def validate_clone_voice_setup():
+    """Validate voice cloning setup and requirements"""
+    try:
+        api_key = os.getenv("ELEVENLABS_API_KEY")
+        if not api_key:
+            return {
+                "status": "error", 
+                "message": "ElevenLabs API key not configured",
+                "requirements": {
+                    "api_key": False,
+                    "file_types_supported": ["wav", "mp3", "m4a", "flac", "ogg"],
+                    "max_files": 25,
+                    "max_file_size_mb": 10
+                }
+            }
+        
+        # Test API connectivity
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.elevenlabs.io/v1/user",
+                headers={"xi-api-key": api_key},
+                timeout=10.0
+            )
+            
+            if response.status_code == 200:
+                user_data = response.json()
+                return {
+                    "status": "ready",
+                    "message": "Voice cloning is available",
+                    "requirements": {
+                        "api_key": True,
+                        "file_types_supported": ["wav", "mp3", "m4a", "flac", "ogg"],
+                        "max_files": 25,
+                        "max_file_size_mb": 10
+                    },
+                    "user_info": {
+                        "subscription": user_data.get("subscription", {}),
+                        "character_limit": user_data.get("character_limit", 0),
+                        "character_count": user_data.get("character_count", 0)
+                    }
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"API connection failed: {response.status_code}",
+                    "requirements": {
+                        "api_key": False,
+                        "file_types_supported": ["wav", "mp3", "m4a", "flac", "ogg"],
+                        "max_files": 25,
+                        "max_file_size_mb": 10
+                    }
+                }
+                
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e),
+            "requirements": {
+                "api_key": False,
+                "file_types_supported": ["wav", "mp3", "m4a", "flac", "ogg"],
+                "max_files": 25,
+                "max_file_size_mb": 10
+            }
+        }
