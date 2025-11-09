@@ -15,7 +15,7 @@ import {
 } from '../types';
 
 // Default to localhost
-const API_BASE_URL = 'http://localhost:9003/api/v1';
+const API_BASE_URL = 'http://localhost:8003/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

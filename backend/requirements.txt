@@ -15,4 +15,3 @@ bcrypt==4.1.1
 pydantic[email]
 groq==0.31.0
 discord.py==2.6.3
-elevenlabs==1.17.1
