@@ -5,7 +5,7 @@ FastAPI-based backend server for multilingual voice translation application.
 ## Features
 
 - 🌍 **Multi-language Translation**: Support for 50+ languages
-- 🔣 **Translation input: Support translate text, record and upload audio files
+- 🔣 **Translation input**: Support translate text, record and upload audio files
 - 🔄 **Multiple Translation Engines**: Google Translate, Groq API, Elevenlabs API
 - 🗣️ **Language Detection**: Automatic language detection
 - 🔐 **User Authentication**: JWT-based auth system
