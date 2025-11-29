@@ -1,4 +1,4 @@
-# Voice Translator Backend
+# Voice Translator System
 
 FastAPI-based backend server for multilingual voice translation application.
 
