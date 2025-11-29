@@ -5,7 +5,8 @@ FastAPI-based backend server for multilingual voice translation application.
 ## Features
 
 - 🌍 **Multi-language Translation**: Support for 50+ languages
-- 🔄 **Multiple Translation Engines**: Google Translate, OpenAI GPT
+- 🔣 **Translation input: Support translate text, record and upload audio files
+- 🔄 **Multiple Translation Engines**: Google Translate, Groq API, Elevenlabs API
 - 🗣️ **Language Detection**: Automatic language detection
 - 🔐 **User Authentication**: JWT-based auth system
 - 📊 **Translation History**: Store and retrieve translation history
@@ -19,67 +20,38 @@ FastAPI-based backend server for multilingual voice translation application.
 - **Database**: PostgreSQL + SQLAlchemy
 - **Cache**: Redis
 - **Authentication**: JWT + OAuth2
-- **Translation**: Google Translate API, OpenAI API
+- **Translation**: Google Translate API, Groq API, Elevenlabs API
 - **Language Detection**: langdetect
 - **Deployment**: Uvicorn ASGI server
 
 ## Quick Start
 
-### 1. Setup
+### 1. Environment Configuration
 
-```bash
-# Make setup script executable
-chmod +x setup.sh
-
-# Run setup
-./setup.sh
-```
-
-### 2. Environment Configuration
-
-Update `.env` file with your configurations:
+Check out `.env.example` file and config with your configurations:
 
 ```env
-# Database
-DATABASE_URL=postgresql://username:password@localhost:5432/translation_db
-
-# Redis
-REDIS_URL=redis://localhost:6379/0
-
 # API Keys
-GOOGLE_TRANSLATE_API_KEY=your_google_api_key
-OPENAI_API_KEY=your_openai_api_key
+GOOGLE_TRANSLATE_API_KEY=your_google_translate_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
 
 # JWT
-SECRET_KEY=your_super_secret_key
-```
+SECRET_KEY=voice_translator_system_secret_key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-### 3. Database Setup
+GROQ_API_KEY=
+
+NGROK_AUTHTOKEN=
+
+DISCORD_BOT_TOKEN=
+
+ELEVENLABS_API_KEY=
+```
+### 2. Run services
 
 ```bash
-# Install PostgreSQL and Redis
-sudo apt-get install postgresql postgresql-contrib redis-server
-
-# Create database
-sudo -u postgres createdb translation_db
-sudo -u postgres createuser username --pwprompt
-
-# Run migrations
-source venv/bin/activate
-alembic upgrade head
-```
-
-### 4. Run Server
-
-```bash
-# Activate virtual environment
-source venv/bin/activate
-
-# Start development server
-python main.py
-
-# Or with uvicorn directly
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+docker compose up -d
 ```
 
 ## API Endpoints
@@ -151,36 +123,54 @@ The API supports translation between 50+ languages including:
 - Chinese (zh)
 - Thai (th)
 - Arabic (ar)
-
+- ...
 ## Development
 
 ### Project Structure
 
 ```
-backend/
-├── app/
-│   ├── api/v1/
-│   │   ├── endpoints/
-│   │   │   ├── auth.py
-│   │   │   └── translation.py
-│   │   └── api.py
-│   ├── services/
-│   │   ├── auth.py
-│   │   └── translation.py
-│   ├── database.py
-│   ├── models.py
-│   └── schemas.py
-├── alembic/
-├── main.py
-├── requirements.txt
-└── .env.example
+backend
+  ├── alembic
+  │   ├── env.py
+  │   ├── script.py.mako
+  │   └── versions
+  ├── alembic.ini
+  ├── app
+  │   ├── api
+  │   ├── connect_app
+  │   ├── database
+  │   ├── public
+  │   ├── services
+  │   └── utils
+  ├── build.sh
+  ├── Dockerfile
+  ├── logs
+  │   └── voice_translator_dev.log
+  ├── main.py
+  ├── migrate.sh
+  └── requirements.txt
+frontend
+  ├── build.sh
+  ├── Dockerfile
+  ├── nginx.conf
+  ├── package.json
+  ├── package-lock.json
+  ├── postcss.config.js
+  ├── public
+  │   ├── index.html
+  │   └── manifest.json
+  ├── src
+  │   ├── App.tsx
+  │   ├── components
+  │   ├── context
+  │   ├── hooks
+  │   ├── index.tsx
+  │   ├── pages
+  │   ├── services
+  │   ├── styles
+  │   └── types
+  └── tailwind.config.js
 ```
-
-### Adding New Translation Engine
-
-1. Create new method in `TranslationService`
-2. Add engine option to `TranslationRequest` schema
-3. Update translation endpoint to handle new engine
 
 ### Database Migrations
 
@@ -201,42 +191,4 @@ alembic downgrade -1
 - **ReDoc**: http://localhost:8000/redoc
 - **OpenAPI JSON**: http://localhost:8000/api/v1/openapi.json
 
-## Production Deployment
 
-### Docker
-
-```dockerfile
-FROM python:3.9-slim
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-
-EXPOSE 8000
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-### Environment Variables for Production
-
-```env
-DATABASE_URL=postgresql://user:pass@db:5432/translation_db
-REDIS_URL=redis://redis:6379/0
-SECRET_KEY=super-secret-production-key
-DEBUG=False
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create feature branch
-3. Make changes
-4. Add tests
-5. Submit pull request
-
-## License
-
-MIT License
