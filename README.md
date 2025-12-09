@@ -32,21 +32,15 @@ Check out `.env.example` file and config with your configurations:
 
 ```env
 # API Keys
-GOOGLE_TRANSLATE_API_KEY=your_google_translate_api_key_here
-OPENAI_API_KEY=your_openai_api_key_here
-
+GOOGLE_TRANSLATE_API_KEY=
+GROQ_API_KEY=
+NGROK_AUTHTOKEN=
+DISCORD_BOT_TOKEN=
+ELEVENLABS_API_KEY=
 # JWT
 SECRET_KEY=voice_translator_system_secret_key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-GROQ_API_KEY=
-
-NGROK_AUTHTOKEN=
-
-DISCORD_BOT_TOKEN=
-
-ELEVENLABS_API_KEY=
 ```
 ### 2. Run services
 
@@ -97,17 +91,6 @@ curl -X POST "http://localhost:8000/api/v1/translate/detect-language" \
   -d '{"text": "Xin chào thế giới"}'
 ```
 
-### Register User
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/auth/register" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "username": "testuser",
-    "password": "password123"
-  }'
-```
 
 ## Supported Languages
 
@@ -188,7 +171,5 @@ alembic downgrade -1
 ## API Documentation
 
 - **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **OpenAPI JSON**: http://localhost:8000/api/v1/openapi.json
 
 
